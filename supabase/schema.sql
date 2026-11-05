@@ -221,6 +221,7 @@ create policy "famille" on public.budgets
 revoke all on all tables in schema public from anon;
 revoke execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, jsonb) from anon, public;
 grant  execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, jsonb) to authenticated;
+revoke execute on function public.is_family_member() from anon, public;
 grant  execute on function public.is_family_member() to authenticated;
 
 -- ---------------------------------------------------------------------
