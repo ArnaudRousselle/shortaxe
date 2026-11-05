@@ -244,3 +244,6 @@ on conflict (name) do nothing;
 insert into public.family_members (email, display_name) values
   ('arnaud.rousselle@gmail.com', 'Arnaud')
 on conflict (email) do nothing;
+insert into public.family_members (email, display_name) values
+  ('christelle.valente74@gmail.com', 'Christelle')
+on conflict (email) do nothing;
