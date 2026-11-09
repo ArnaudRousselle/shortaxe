@@ -228,17 +228,18 @@ grant  execute on function public.is_family_member() to authenticated;
 -- Données de départ
 -- ---------------------------------------------------------------------
 insert into public.categories (name, color) values
-  ('Courses',      '#16a34a'),
-  ('Restaurants',  '#ea580c'),
-  ('Loisirs',      '#7c3aed'),
+  ('Banque',       '#475569'),
+  ('Économies',    '#0891b2'),
+  ('Revenus',      '#059669'),
   ('Maison',       '#0284c7'),
-  ('Transport',    '#ca8a04'),
-  ('Santé',        '#dc2626'),
-  ('Abonnements',  '#db2777'),
-  ('Vêtements',    '#0d9488'),
-  ('Cadeaux',      '#9333ea'),
-  ('Divers',       '#64748b'),
-  ('Revenus',      '#059669')
+  ('Voiture',      '#ca8a04'),
+  ('Loisirs',      '#7c3aed'),
+  ('École',        '#2563eb'),
+  ('Impôts',       '#b91c1c'),
+  ('Anniversaire', '#db2777'),
+  ('Noël',         '#15803d'),
+  ('Courses',      '#16a34a'),
+  ('Santé',        '#dc2626')
 on conflict (name) do nothing;
 
 -- Ajoute ici l'adresse e-mail de chaque membre de la famille :
