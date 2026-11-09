@@ -67,3 +67,32 @@ export type AccountBalance = {
   balance: number
   checked_balance: number
 }
+
+/** Échéance : modèle d'opération qui se répète tous les N mois */
+export type ScheduledTransaction = {
+  id: string
+  account_id: string
+  label: string
+  /** Négatif = dépense, positif = recette */
+  amount: number
+  notes: string | null
+  /** 1 = tous les mois, 12 = tous les ans */
+  frequency_months: number
+  /** Date de la prochaine opération à créer (YYYY-MM-DD) */
+  next_date: string
+  day_of_month: number
+  created_at: string
+  updated_at: string
+  scheduled_transaction_splits: Split[]
+}
+
+export type ScheduledTransactionInput = {
+  id: string | null
+  account_id: string
+  label: string
+  amount: number
+  notes: string | null
+  frequency_months: number
+  next_date: string
+  splits: { category_id: string; amount: number }[]
+}

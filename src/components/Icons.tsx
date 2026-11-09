@@ -68,3 +68,9 @@ export const IconTrash = (p: P) => (
 export const IconSearch = (p: P) => (
   <Base {...p}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></Base>
 )
+export const IconCalendar = (p: P) => (
+  <Base {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /><path d="m9 15 2 2 4-4" /></Base>
+)
+export const IconRepeat = (p: P) => (
+  <Base {...p}><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></Base>
+)

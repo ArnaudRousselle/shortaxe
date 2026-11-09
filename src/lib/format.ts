@@ -99,3 +99,18 @@ export function formatDay(iso: string): string {
 export function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(parseISO(iso))
 }
+
+// ---------- Échéancier ----------
+
+/** 1 → "Tous les mois", 12 → "Tous les ans", 3 → "Tous les 3 mois" */
+export function formatFrequency(months: number): string {
+  if (months === 1) return 'Tous les mois'
+  if (months === 12) return 'Tous les ans'
+  if (months > 12 && months % 12 === 0) return `Tous les ${months / 12} ans`
+  return `Tous les ${months} mois`
+}
+
+/** Une échéance est à créer si sa prochaine date tombe avant le mois prochain (mois en cours ou en retard). */
+export function isScheduleDue(nextDate: string, today: string = todayISO()): boolean {
+  return nextDate < addMonths(monthStart(today), 1)
+}

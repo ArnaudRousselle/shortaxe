@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteTransaction, recentLabels, saveTransaction } from '../lib/api'
-import { centsToInput, formatEuro, parseEuroToCents, todayISO, toCents } from '../lib/format'
+import { centsToInput, parseEuroToCents, todayISO, toCents } from '../lib/format'
 import { computeSplits, type SplitRow } from '../lib/splits'
 import { errorMessage } from '../lib/supabase'
 import type { Transaction } from '../lib/types'
-import { CategoryDot, ErrorBanner, Modal, Segmented } from './ui'
-import { IconPlus, IconTrash } from './Icons'
+import { ErrorBanner, Modal, Segmented } from './ui'
+import { newSplitKey, SplitEditor } from './SplitEditor'
 
 type Kind = 'depense' | 'recette'
 type Row = SplitRow
-
-let nextKey = 1
 
 export function TransactionModal({
   open,
@@ -26,7 +24,7 @@ export function TransactionModal({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { accounts, categories, categoryById } = useData()
+  const { accounts, categories } = useData()
   const activeAccounts = accounts.filter((a) => !a.is_archived || a.id === transaction?.account_id)
   const usedCategoryIds = new Set(transaction?.transaction_splits.map((s) => s.category_id) ?? [])
   const selectableCategories = categories.filter((c) => !c.is_archived || usedCategoryIds.has(c.id))
@@ -58,7 +56,7 @@ export function TransactionModal({
       setIsChecked(transaction.is_checked)
       setRows(
         transaction.transaction_splits.map((s) => ({
-          key: nextKey++,
+          key: newSplitKey(),
           categoryId: s.category_id,
           value: centsToInput(Math.abs(toCents(s.amount))),
         })),
@@ -71,7 +69,7 @@ export function TransactionModal({
       setAmount('')
       setNotes('')
       setIsChecked(false)
-      setRows([{ key: nextKey++, categoryId: '', value: '' }])
+      setRows([{ key: newSplitKey(), categoryId: '', value: '' }])
     }
     recentLabels().then(setLabels).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,28 +77,6 @@ export function TransactionModal({
 
   const totalCents = parseEuroToCents(amount)
   const result = useMemo(() => computeSplits(totalCents ?? 0, rows), [totalCents, rows])
-
-  function updateRow(key: number, patch: Partial<Row>) {
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
-  }
-
-  function addRow() {
-    if (rows.length === 0) {
-      setRows([{ key: nextKey++, categoryId: '', value: '' }])
-      return
-    }
-    if (rows.length === 1) {
-      // Une seule ligne recevait tout le montant : on le lui laisse, la nouvelle ligne est à compléter
-      setRows([
-        { ...rows[0], value: centsToInput(totalCents ?? 0) },
-        { key: nextKey++, categoryId: '', value: '' },
-      ])
-      return
-    }
-    // Pré-remplit la nouvelle ligne avec ce qu'il reste à ventiler
-    const value = result.remaining > 0 ? centsToInput(result.remaining) : ''
-    setRows((rs) => [...rs, { key: nextKey++, categoryId: '', value }])
-  }
 
   async function onSubmit() {
     setError(null)
@@ -144,7 +120,6 @@ export function TransactionModal({
     }
   }
 
-  const multi = rows.length > 1
 
   return (
     <Modal
@@ -208,70 +183,13 @@ export function TransactionModal({
           </select>
         </div>
 
-        {/* Ventilation */}
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="mb-3">
-            <span className="text-sm font-medium text-slate-700">Catégories</span>
-          </div>
-
-          {rows.length === 0 && (
-            <p className="mb-2 text-sm text-slate-500">Sans catégorie (par exemple un virement entre comptes).</p>
-          )}
-
-          <div className="space-y-2">
-            {rows.map((r) => {
-              const cat = categoryById[r.categoryId]
-              return (
-                <div key={r.key} className="flex items-center gap-2">
-                  {cat && <CategoryDot color={cat.color} />}
-                  <select
-                    className="input min-w-0 flex-1"
-                    value={r.categoryId}
-                    onChange={(e) => updateRow(r.key, { categoryId: e.target.value })}
-                    aria-label="Catégorie"
-                  >
-                    <option value="">Choisir…</option>
-                    {selectableCategories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                  {multi && (
-                    <div className="relative w-28 shrink-0">
-                      <input
-                        className="input pr-7 text-right tabular-nums"
-                        inputMode="decimal"
-                        value={r.value}
-                        onChange={(e) => updateRow(r.key, { value: e.target.value })}
-                        placeholder="0,00"
-                        aria-label="Montant"
-                      />
-                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500">€</span>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="btn-ghost shrink-0"
-                    onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
-                    aria-label="Retirer la ligne"
-                  >
-                    <IconTrash className="h-4 w-4" />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <button type="button" className="btn-ghost text-brand-700" onClick={addRow}>
-              <IconPlus className="h-4 w-4" /> {rows.length === 0 ? 'Ajouter une catégorie' : 'Répartir sur une autre catégorie'}
-            </button>
-            {multi && totalCents !== null && totalCents > 0 && result.remaining !== 0 && (
-              <span className="text-sm text-amber-700">
-                {result.remaining > 0 ? 'Reste à répartir' : 'Dépassement'} : {formatEuro(Math.abs(result.remaining) / 100)}
-              </span>
-            )}
-          </div>
-        </div>
+        <SplitEditor
+          rows={rows}
+          setRows={setRows}
+          totalCents={totalCents}
+          result={result}
+          categories={selectableCategories}
+        />
 
         <div>
           <label className="label" htmlFor="tx-notes">Note (facultatif)</label>

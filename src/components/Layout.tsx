@@ -2,13 +2,14 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Logo } from './Logo'
-import { IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTarget, IconWallet } from './Icons'
+import { IconCalendar, IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTarget, IconWallet } from './Icons'
 
 type NavItem = { to: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }
 
 const mainNav: NavItem[] = [
   { to: '/', label: 'Accueil', icon: IconHome },
   { to: '/operations', label: 'Opérations', icon: IconList },
+  { to: '/echeancier', label: 'Échéancier', icon: IconCalendar },
   { to: '/budgets', label: 'Budgets', icon: IconTarget },
   { to: '/rapports', label: 'Rapports', icon: IconChart },
 ]
@@ -39,8 +40,11 @@ function SideLink({ item }: { item: NavItem }) {
 
 export function Layout() {
   const { session, signOut } = useAuth()
-  // Sur mobile, "Réglages" regroupe aussi Comptes et Catégories
-  const bottomNav: NavItem[] = [...mainNav, { to: '/reglages', label: 'Réglages', icon: IconSettings }]
+  // Sur mobile, "Réglages" regroupe aussi Échéancier, Comptes et Catégories
+  const bottomNav: NavItem[] = [
+    ...mainNav.filter((i) => i.to !== '/echeancier'),
+    { to: '/reglages', label: 'Réglages', icon: IconSettings },
+  ]
 
   return (
     <div className="min-h-dvh md:flex">
