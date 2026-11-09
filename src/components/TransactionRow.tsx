@@ -1,4 +1,5 @@
 import { useData } from '../data/DataProvider'
+import { formatEuro } from '../lib/format'
 import type { Transaction } from '../lib/types'
 import { Amount, CategoryDot } from './ui'
 import { IconCheck } from './Icons'
@@ -40,12 +41,12 @@ export function TransactionRow({
             {t.transaction_splits.length === 0 && <span className="text-amber-700">Sans catégorie</span>}
             {t.transaction_splits.map((s) => {
               const c = categoryById[s.category_id]
-              const pct = t.transaction_splits.length > 1 && t.amount !== 0 ? Math.round((s.amount / t.amount) * 100) : null
+              const multi = t.transaction_splits.length > 1
               return (
                 <span key={s.id ?? s.category_id} className="inline-flex items-center gap-1">
                   <CategoryDot color={c?.color ?? '#94a3b8'} className="h-2 w-2" />
                   {c?.name ?? '?'}
-                  {pct !== null && <span className="text-slate-400">{pct} %</span>}
+                  {multi && <span className="text-slate-400 tabular-nums">{formatEuro(Math.abs(s.amount))}</span>}
                 </span>
               )
             })}

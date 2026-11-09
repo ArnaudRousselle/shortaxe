@@ -34,14 +34,6 @@ export function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace('.', ',')
 }
 
-/** "30" / "33,5" → pourcentage ; null si invalide */
-export function parsePercent(input: string): number | null {
-  const cleaned = input.replace(/[\s%]/g, '').replace(',', '.')
-  if (cleaned === '') return null
-  const n = Number(cleaned)
-  return Number.isFinite(n) && n >= 0 ? n : null
-}
-
 // ---------- Dates (chaînes YYYY-MM-DD, sans fuseau) ----------
 
 function pad(n: number): string {
