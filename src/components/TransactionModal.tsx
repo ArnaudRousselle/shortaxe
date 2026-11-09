@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteTransaction, recentLabels, saveTransaction } from '../lib/api'
 import { centsToInput, formatEuro, parseEuroToCents, todayISO, toCents } from '../lib/format'
-import { computeSplits, formatPct, type SplitMode, type SplitRow } from '../lib/splits'
+import { computeSplits, type SplitRow } from '../lib/splits'
 import { errorMessage } from '../lib/supabase'
 import type { Transaction } from '../lib/types'
 import { CategoryDot, ErrorBanner, Modal, Segmented } from './ui'
 import { IconPlus, IconTrash } from './Icons'
 
 type Kind = 'depense' | 'recette'
-type Mode = SplitMode
 type Row = SplitRow
 
 let nextKey = 1
@@ -39,7 +38,6 @@ export function TransactionModal({
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [isChecked, setIsChecked] = useState(false)
-  const [mode, setMode] = useState<Mode>('pct')
   const [rows, setRows] = useState<Row[]>([])
   const [labels, setLabels] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -58,7 +56,6 @@ export function TransactionModal({
       setAmount(centsToInput(total))
       setNotes(transaction.notes ?? '')
       setIsChecked(transaction.is_checked)
-      setMode('eur')
       setRows(
         transaction.transaction_splits.map((s) => ({
           key: nextKey++,
@@ -74,51 +71,35 @@ export function TransactionModal({
       setAmount('')
       setNotes('')
       setIsChecked(false)
-      setMode('pct')
-      setRows([{ key: nextKey++, categoryId: '', value: '100' }])
+      setRows([{ key: nextKey++, categoryId: '', value: '' }])
     }
     recentLabels().then(setLabels).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, transaction])
 
   const totalCents = parseEuroToCents(amount)
-  const result = useMemo(() => computeSplits(totalCents ?? 0, rows, mode), [totalCents, rows, mode])
+  const result = useMemo(() => computeSplits(totalCents ?? 0, rows), [totalCents, rows])
 
   function updateRow(key: number, patch: Partial<Row>) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
   }
 
   function addRow() {
-    const full = mode === 'pct' ? '100' : centsToInput(totalCents ?? 0)
-    if (rows.length <= 1) {
-      // Une seule ligne = 100 % du montant ; la nouvelle ligne reste à compléter
-      setRows(
-        rows.length === 0
-          ? [{ key: nextKey++, categoryId: '', value: full }]
-          : [...rows.map((r) => ({ ...r, value: '' })), { key: nextKey++, categoryId: '', value: '' }],
-      )
+    if (rows.length === 0) {
+      setRows([{ key: nextKey++, categoryId: '', value: '' }])
+      return
+    }
+    if (rows.length === 1) {
+      // Une seule ligne recevait tout le montant : on le lui laisse, la nouvelle ligne est à compléter
+      setRows([
+        { ...rows[0], value: centsToInput(totalCents ?? 0) },
+        { key: nextKey++, categoryId: '', value: '' },
+      ])
       return
     }
     // Pré-remplit la nouvelle ligne avec ce qu'il reste à ventiler
-    const value = result.remaining > 0 ? (mode === 'pct' ? formatPct(result.remaining) : centsToInput(result.remaining)) : ''
+    const value = result.remaining > 0 ? centsToInput(result.remaining) : ''
     setRows((rs) => [...rs, { key: nextKey++, categoryId: '', value }])
-  }
-
-  function switchMode(m: Mode) {
-    if (m === mode) return
-    // Convertit les valeurs saisies pour ne pas perdre la répartition
-    const total = totalCents ?? 0
-    if (rows.length > 1 && total > 0 && !result.error) {
-      setRows(
-        rows.map((r, i) => {
-          const cents = result.splits[i].cents
-          return { ...r, value: m === 'eur' ? centsToInput(cents) : formatPct((cents / total) * 100) }
-        }),
-      )
-    } else {
-      setRows(rows.map((r) => ({ ...r, value: '' })))
-    }
-    setMode(m)
   }
 
   async function onSubmit() {
@@ -229,18 +210,8 @@ export function TransactionModal({
 
         {/* Ventilation */}
         <div className="rounded-lg border border-slate-200 p-3">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="mb-3">
             <span className="text-sm font-medium text-slate-700">Catégories</span>
-            {multi && (
-              <Segmented<Mode>
-                value={mode}
-                onChange={switchMode}
-                options={[
-                  { value: 'pct', label: '%' },
-                  { value: 'eur', label: '€' },
-                ]}
-              />
-            )}
           </div>
 
           {rows.length === 0 && (
@@ -271,11 +242,10 @@ export function TransactionModal({
                         inputMode="decimal"
                         value={r.value}
                         onChange={(e) => updateRow(r.key, { value: e.target.value })}
-                        aria-label={mode === 'pct' ? 'Pourcentage' : 'Montant'}
+                        placeholder="0,00"
+                        aria-label="Montant"
                       />
-                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500">
-                        {mode === 'pct' ? '%' : '€'}
-                      </span>
+                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500">€</span>
                     </div>
                   )}
                   <button
@@ -297,15 +267,10 @@ export function TransactionModal({
             </button>
             {multi && totalCents !== null && totalCents > 0 && result.remaining !== 0 && (
               <span className="text-sm text-amber-700">
-                Reste : {mode === 'pct' ? `${formatPct(result.remaining)} %` : formatEuro(result.remaining / 100)}
+                {result.remaining > 0 ? 'Reste à répartir' : 'Dépassement'} : {formatEuro(Math.abs(result.remaining) / 100)}
               </span>
             )}
           </div>
-          {multi && !result.error && totalCents !== null && totalCents > 0 && mode === 'pct' && (
-            <p className="mt-2 text-xs text-slate-500">
-              {result.splits.map((s) => `${categoryById[s.categoryId]?.name ?? '?'} : ${formatEuro(s.cents / 100)}`).join(' · ')}
-            </p>
-          )}
         </div>
 
         <div>

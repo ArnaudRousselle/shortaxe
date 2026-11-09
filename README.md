@@ -18,7 +18,7 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 | Comptes / Catégories | Création, modification, archivage |
 | Réglages | Export de toutes les données en JSON |
 
-**Ventilation** : une opération peut être répartie sur plusieurs catégories, en pourcentage ou en euros (ex. Intermarché : 30 % Loisirs, 70 % Courses). La base de données vérifie que la somme de la ventilation est égale au montant.
+**Ventilation** : une opération peut être répartie sur plusieurs catégories, en saisissant le montant de chaque part en euros (ex. Intermarché 100 € : 30 € Loisirs, 70 € Courses). La base de données vérifie que la somme de la ventilation est égale au montant.
 
 **Partage familial** : tous les membres voient et modifient les mêmes données. Seules les adresses e-mail inscrites dans la table `family_members` ont accès aux données (sécurité appliquée côté base de données).
 
