@@ -5,7 +5,7 @@ import { exportAll } from '../lib/api'
 import { todayISO } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import { ErrorBanner, PageHeader } from '../components/ui'
-import { IconChevronRight, IconDownload, IconLogout, IconTag, IconWallet } from '../components/Icons'
+import { IconCalendar, IconChevronRight, IconDownload, IconLogout, IconTag, IconWallet } from '../components/Icons'
 
 export function SettingsPage() {
   const { session, signOut } = useAuth()
@@ -29,7 +29,7 @@ export function SettingsPage() {
       a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
       const c = backup.counts
-      setInfo(`Sauvegarde téléchargée : ${c.accounts} comptes, ${c.categories} catégories, ${c.transactions} opérations, ${c.budgets} budgets.`)
+      setInfo(`Sauvegarde téléchargée : ${c.accounts} comptes, ${c.categories} catégories, ${c.transactions} opérations, ${c.budgets} budgets, ${c.scheduled_transactions} échéances.`)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -50,6 +50,7 @@ export function SettingsPage() {
       <PageHeader title="Réglages" />
       <div className="space-y-6">
         <section className="card divide-y divide-slate-100 overflow-hidden">
+          {link('/echeancier', 'Échéancier', IconCalendar)}
           {link('/comptes', 'Comptes bancaires', IconWallet)}
           {link('/categories', 'Catégories', IconTag)}
         </section>
@@ -57,7 +58,7 @@ export function SettingsPage() {
         <section className="card p-4">
           <h2 className="font-semibold">Sauvegarde</h2>
           <p className="mt-1 mb-3 text-sm text-slate-600">
-            Télécharge l’ensemble des données (comptes, catégories, opérations, ventilations, budgets) dans un fichier JSON.
+            Télécharge l’ensemble des données (comptes, catégories, opérations, ventilations, budgets, échéancier) dans un fichier JSON.
           </p>
           <ErrorBanner message={error} />
           {info && <p className="mb-3 rounded-lg bg-brand-50 p-3 text-sm text-brand-800">{info}</p>}

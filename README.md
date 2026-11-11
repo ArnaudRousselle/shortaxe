@@ -13,6 +13,7 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 |---|---|
 | Accueil | Soldes des comptes, reste à dépenser du mois par catégorie, dernières opérations |
 | Opérations | Liste par mois ou par année, filtres compte / catégorie / recherche, pointage, saisie et modification |
+| Échéancier | Opérations récurrentes (fréquence en mois, prochaine échéance) ; les échéances du mois en orange ; sélection multiple puis « Créer les opérations » |
 | Budgets | Budget par catégorie et par mois, dépensé, reste ; copie du mois précédent ; application jusqu'à décembre |
 | Rapports | Bilan mensuel ou annuel : recettes, dépenses, budgets, détail mois par mois |
 | Comptes / Catégories | Création, modification, archivage |
@@ -75,10 +76,16 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 | `transactions` | Opérations : montant **négatif = dépense**, **positif = recette** |
 | `transaction_splits` | Ventilation d'une opération par catégorie (même signe que l'opération) |
 | `budgets` | Budget d'une catégorie pour un mois (`month` = 1er du mois) |
+| `scheduled_transactions` | Échéancier : modèle d'opération + `frequency_months` (1 = tous les mois, 12 = tous les ans) + `next_date` |
+| `scheduled_transaction_splits` | Ventilation d'une échéance par catégorie |
 | `family_members` | E-mails autorisés à accéder aux données |
 
 Vues : `account_balances` (solde et solde pointé par compte), `category_monthly_totals` (total par catégorie et par mois).
-Fonction : `save_transaction(...)` enregistre une opération et sa ventilation en une seule transaction, avec contrôle de cohérence.
+Fonctions : `save_transaction(...)` enregistre une opération et sa ventilation en une seule transaction, avec contrôle de cohérence ; `save_scheduled_transaction(...)` fait de même pour une échéance ; `create_transactions_from_schedule(ids)` crée les opérations des échéances choisies (datées de leur prochaine échéance, ventilation recopiée) et décale leur date de la fréquence (le jour voulu est conservé : un 31 donne le 30 ou le 28/29 selon le mois).
+
+L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas été transformée en opération, elle n'entre ni dans les soldes, ni dans les budgets, ni dans les rapports.
+
+**Évolutions du schéma** : pour une base déjà installée, exécuter dans le SQL Editor les fichiers de `supabase/migrations/` qui n'ont pas encore été appliqués (`schema.sql` contient toujours le schéma complet pour une nouvelle installation).
 
 Le « dépensé » d'une catégorie correspond aux dépenses moins les remboursements ventilés sur cette catégorie. Une opération sans catégorie (par exemple un virement entre deux comptes) n'entre dans aucun budget.
 

@@ -5,6 +5,8 @@ import type {
   Budget,
   Category,
   CategoryMonthlyTotal,
+  ScheduledTransaction,
+  ScheduledTransactionInput,
   Transaction,
   TransactionInput,
 } from './types'
@@ -149,6 +151,57 @@ export async function recentLabels(): Promise<string[]> {
   return Array.from(new Set(rows.map((r) => r.label)))
 }
 
+// ---------------------------------------------------------------- Échéancier
+
+export async function listScheduled(): Promise<ScheduledTransaction[]> {
+  const rows = check(
+    await supabase
+      .from('scheduled_transactions')
+      .select('*, scheduled_transaction_splits(*)')
+      .order('next_date')
+      .order('label'),
+  ) as ScheduledTransaction[]
+  return rows.map((t) => ({
+    ...t,
+    amount: num(t.amount),
+    scheduled_transaction_splits: (t.scheduled_transaction_splits ?? []).map((s) => ({ ...s, amount: num(s.amount) })),
+  }))
+}
+
+export async function saveScheduled(t: ScheduledTransactionInput): Promise<string> {
+  const res = await supabase.rpc('save_scheduled_transaction', {
+    p_id: t.id,
+    p_account_id: t.account_id,
+    p_label: t.label,
+    p_amount: t.amount,
+    p_notes: t.notes,
+    p_frequency_months: t.frequency_months,
+    p_next_date: t.next_date,
+    p_splits: t.splits,
+  })
+  return check(res) as string
+}
+
+export async function deleteScheduled(id: string): Promise<void> {
+  check(await supabase.from('scheduled_transactions').delete().eq('id', id))
+}
+
+/** Crée les opérations des échéances choisies et décale leur prochaine date. Renvoie le nombre créé. */
+export async function createTransactionsFromSchedule(ids: string[]): Promise<number> {
+  const res = await supabase.rpc('create_transactions_from_schedule', { p_ids: ids })
+  return Number(check(res))
+}
+
+/** Nombre d'échéances à créer (prochaine date avant le mois suivant) */
+export async function countDueScheduled(before: string): Promise<number> {
+  const res = await supabase
+    .from('scheduled_transactions')
+    .select('id', { count: 'exact', head: true })
+    .lt('next_date', before)
+  if (res.error) throw res.error
+  return res.count ?? 0
+}
+
 // ---------------------------------------------------------------- Budgets
 
 export async function listBudgets(from: string, to: string): Promise<Budget[]> {
@@ -194,16 +247,26 @@ async function fetchAll(table: string): Promise<unknown[]> {
 }
 
 export async function exportAll(): Promise<object> {
-  const [accounts, categories, transactions, transaction_splits, budgets] = await Promise.all([
+  const [
+    accounts,
+    categories,
+    transactions,
+    transaction_splits,
+    budgets,
+    scheduled_transactions,
+    scheduled_transaction_splits,
+  ] = await Promise.all([
     fetchAll('accounts'),
     fetchAll('categories'),
     fetchAll('transactions'),
     fetchAll('transaction_splits'),
     fetchAll('budgets'),
+    fetchAll('scheduled_transactions'),
+    fetchAll('scheduled_transaction_splits'),
   ])
   return {
     app: 'shortaxe',
-    format_version: 1,
+    format_version: 2,
     exported_at: new Date().toISOString(),
     counts: {
       accounts: accounts.length,
@@ -211,7 +274,17 @@ export async function exportAll(): Promise<object> {
       transactions: transactions.length,
       transaction_splits: transaction_splits.length,
       budgets: budgets.length,
+      scheduled_transactions: scheduled_transactions.length,
+      scheduled_transaction_splits: scheduled_transaction_splits.length,
     },
-    data: { accounts, categories, transactions, transaction_splits, budgets },
+    data: {
+      accounts,
+      categories,
+      transactions,
+      transaction_splits,
+      budgets,
+      scheduled_transactions,
+      scheduled_transaction_splits,
+    },
   }
 }

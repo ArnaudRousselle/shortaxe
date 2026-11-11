@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../data/DataProvider'
-import { getCategoryTotals, listBalances, listBudgets, listTransactions } from '../lib/api'
+import { countDueScheduled, getCategoryTotals, listBalances, listBudgets, listTransactions } from '../lib/api'
 import { addMonths, currentMonth, formatEuro, formatMonth } from '../lib/format'
 import { buildCategoryLines, round2 } from '../lib/report'
 import { useAsync } from '../lib/useAsync'
@@ -9,7 +9,7 @@ import type { Transaction } from '../lib/types'
 import { Amount, BudgetBar, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
 import { TransactionModal } from '../components/TransactionModal'
 import { TransactionRow } from '../components/TransactionRow'
-import { IconPlus } from '../components/Icons'
+import { IconChevronRight, IconPlus } from '../components/Icons'
 
 export function DashboardPage() {
   const { accounts, categories, loading: refLoading, error: refError } = useData()
@@ -19,13 +19,14 @@ export function DashboardPage() {
 
   const load = useCallback(async () => {
     const next = addMonths(month, 1)
-    const [balances, budgets, totals, recent] = await Promise.all([
+    const [balances, budgets, totals, recent, dueCount] = await Promise.all([
       listBalances(),
       listBudgets(month, next),
       getCategoryTotals(month, next),
       listTransactions({ limit: 8 }),
+      countDueScheduled(next).catch(() => 0),
     ])
-    return { balances, budgets, totals, recent }
+    return { balances, budgets, totals, recent, dueCount }
   }, [month])
   const { data, loading, error, reload } = useAsync(load, [load])
 
@@ -57,6 +58,18 @@ export function DashboardPage() {
         }
       />
       <ErrorBanner message={refError || error} />
+
+      {(data?.dueCount ?? 0) > 0 && (
+        <Link
+          to="/echeancier"
+          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900 hover:bg-orange-100"
+        >
+          <span>
+            <strong>{data?.dueCount} échéance{(data?.dueCount ?? 0) > 1 ? 's' : ''}</strong> à créer ce mois-ci dans l’échéancier
+          </span>
+          <IconChevronRight className="h-4 w-4 shrink-0" />
+        </Link>
+      )}
 
       {activeAccounts.length === 0 ? (
         <EmptyState>
