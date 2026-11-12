@@ -16,6 +16,7 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 | Échéancier | Opérations récurrentes (fréquence en mois, prochaine échéance) ; les échéances du mois en orange ; sélection multiple puis « Créer les opérations » |
 | Budgets | Budget par catégorie et par mois, dépensé, reste ; copie du mois précédent ; application jusqu'à décembre |
 | Rapports | Bilan mensuel ou annuel : recettes, dépenses, budgets, détail mois par mois |
+| Évolution | Graphique du solde jour par jour (tous les comptes ou un seul) : historique réel et prévision tenant compte de l'échéancier ; par défaut d'il y a 1 an à dans 2 mois |
 | Comptes / Catégories | Création, modification, archivage |
 | Réglages | Export de toutes les données en JSON |
 

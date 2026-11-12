@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Logo } from './Logo'
-import { IconCalendar, IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTarget, IconWallet } from './Icons'
+import { IconCalendar, IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTarget, IconTrend, IconWallet } from './Icons'
 
 type NavItem = { to: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }
 
@@ -12,6 +12,7 @@ const mainNav: NavItem[] = [
   { to: '/echeancier', label: 'Échéancier', icon: IconCalendar },
   { to: '/budgets', label: 'Budgets', icon: IconTarget },
   { to: '/rapports', label: 'Rapports', icon: IconChart },
+  { to: '/evolution', label: 'Évolution', icon: IconTrend },
 ]
 
 const secondaryNav: NavItem[] = [
@@ -40,9 +41,10 @@ function SideLink({ item }: { item: NavItem }) {
 
 export function Layout() {
   const { session, signOut } = useAuth()
-  // Sur mobile, "Réglages" regroupe aussi Échéancier, Comptes et Catégories
+  // Sur mobile, "Réglages" regroupe aussi Échéancier, Évolution, Comptes et Catégories
+  // (Évolution est aussi accessible depuis l'accueil)
   const bottomNav: NavItem[] = [
-    ...mainNav.filter((i) => i.to !== '/echeancier'),
+    ...mainNav.filter((i) => i.to !== '/echeancier' && i.to !== '/evolution'),
     { to: '/reglages', label: 'Réglages', icon: IconSettings },
   ]
 

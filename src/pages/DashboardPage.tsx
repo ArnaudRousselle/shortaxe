@@ -82,7 +82,10 @@ export function DashboardPage() {
           <section>
             <div className="mb-2 flex items-baseline justify-between">
               <h2 className="text-lg font-semibold">Soldes</h2>
-              <Link to="/comptes" className="text-sm text-brand-700">Gérer</Link>
+              <span className="flex gap-4">
+                <Link to="/evolution" className="text-sm text-brand-700">Évolution</Link>
+                <Link to="/comptes" className="text-sm text-brand-700">Gérer</Link>
+              </span>
             </div>
             <div className="card overflow-hidden">
               <ul className="divide-y divide-slate-100">
