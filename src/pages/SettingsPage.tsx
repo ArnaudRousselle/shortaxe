@@ -5,7 +5,7 @@ import { exportAll } from '../lib/api'
 import { todayISO } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import { ErrorBanner, PageHeader } from '../components/ui'
-import { IconCalendar, IconChevronRight, IconDownload, IconLogout, IconTag, IconWallet } from '../components/Icons'
+import { IconCalendar, IconChevronRight, IconDownload, IconLogout, IconTag, IconTrend, IconWallet } from '../components/Icons'
 
 export function SettingsPage() {
   const { session, signOut } = useAuth()
@@ -51,6 +51,7 @@ export function SettingsPage() {
       <div className="space-y-6">
         <section className="card divide-y divide-slate-100 overflow-hidden">
           {link('/echeancier', 'Échéancier', IconCalendar)}
+          {link('/evolution', 'Évolution du solde', IconTrend)}
           {link('/comptes', 'Comptes bancaires', IconWallet)}
           {link('/categories', 'Catégories', IconTag)}
         </section>

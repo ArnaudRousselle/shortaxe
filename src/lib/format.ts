@@ -96,6 +96,13 @@ export function formatDay(iso: string): string {
   )
 }
 
+/** "2026-11-12" → "Jeu. 12 novembre 2026" */
+export function formatDayYear(iso: string): string {
+  return capitalize(
+    new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).format(parseISO(iso)),
+  )
+}
+
 export function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(parseISO(iso))
 }

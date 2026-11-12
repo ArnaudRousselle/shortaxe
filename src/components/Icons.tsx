@@ -71,6 +71,9 @@ export const IconSearch = (p: P) => (
 export const IconCalendar = (p: P) => (
   <Base {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /><path d="m9 15 2 2 4-4" /></Base>
 )
+export const IconTrend = (p: P) => (
+  <Base {...p}><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></Base>
+)
 export const IconRepeat = (p: P) => (
   <Base {...p}><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></Base>
 )
