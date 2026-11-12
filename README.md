@@ -54,6 +54,17 @@ cp .env.example .env.local   # puis renseigner l'URL et la clé
 npm run dev
 ```
 
+### Tests
+
+Les calculs de `src/lib/` (solde et prévisions, échéancier, ventilation, formats, rapports) sont couverts par des tests unitaires [Vitest](https://vitest.dev) (fichiers `*.test.ts` à côté du code testé).
+
+```bash
+npm test             # lance les tests une fois
+npm run test:watch   # relance les tests à chaque modification
+```
+
+Une GitHub Action ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) vérifie les types et lance les tests à chaque push sur `main` et à chaque pull request.
+
 ### 3. Déployer sur Vercel
 
 1. Crée un compte sur [vercel.com](https://vercel.com) avec ton compte GitHub.
@@ -101,7 +112,7 @@ src/
   auth/        connexion, mot de passe, contrôle d'accès
   components/  mise en page, modale d'opération, composants communs
   data/        comptes et catégories partagés entre les écrans
-  lib/         client Supabase, accès aux données, formats, calculs
+  lib/         client Supabase, accès aux données, formats, calculs (+ tests *.test.ts)
   pages/       un fichier par écran
 supabase/
   schema.sql   tables, sécurité, vues, fonctions
