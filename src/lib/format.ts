@@ -121,3 +121,8 @@ export function formatFrequency(months: number): string {
 export function isScheduleDue(nextDate: string, today: string = todayISO()): boolean {
   return nextDate < addMonths(monthStart(today), 1)
 }
+
+/** Arrondi au centime */
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}

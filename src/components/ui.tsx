@@ -53,10 +53,6 @@ export function BudgetBadge() {
   )
 }
 
-export function CategoryDot({ color, className = 'h-2.5 w-2.5' }: { color: string; className?: string }) {
-  return <span className={`inline-block shrink-0 rounded-full ${className}`} style={{ backgroundColor: color }} />
-}
-
 export function MonthPicker({ month, onChange }: { month: string; onChange: (m: string) => void }) {
   return (
     <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white">

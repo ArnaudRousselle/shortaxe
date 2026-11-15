@@ -43,17 +43,6 @@ create table if not exists public.accounts (
 );
 
 -- ---------------------------------------------------------------------
--- Catégories personnalisables
--- ---------------------------------------------------------------------
-create table if not exists public.categories (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null unique,
-  color       text not null default '#64748b',
-  is_archived boolean not null default false,
-  created_at  timestamptz not null default now()
-);
-
--- ---------------------------------------------------------------------
 -- Opérations : montant négatif = dépense, positif = recette
 -- ---------------------------------------------------------------------
 create table if not exists public.transactions (
@@ -78,30 +67,9 @@ create index if not exists transactions_account_date_idx on public.transactions 
 create index if not exists transactions_date_idx on public.transactions (date);
 create index if not exists transactions_budget_idx on public.transactions (budget_id) where budget_id is not null;
 
--- Ventilation d'une opération sur une ou plusieurs catégories.
--- La somme des ventilations est égale au montant de l'opération (même signe).
-create table if not exists public.transaction_splits (
-  id             uuid primary key default gen_random_uuid(),
-  transaction_id uuid not null references public.transactions(id) on delete cascade,
-  category_id    uuid not null references public.categories(id) on delete restrict,
-  amount         numeric(12,2) not null
-);
-create index if not exists transaction_splits_tx_idx on public.transaction_splits (transaction_id);
-create index if not exists transaction_splits_cat_idx on public.transaction_splits (category_id);
-
 -- ---------------------------------------------------------------------
 -- Vues de reporting (respectent la sécurité de l'utilisateur connecté)
 -- ---------------------------------------------------------------------
-create or replace view public.category_monthly_totals
-with (security_invoker = true) as
-select
-  date_trunc('month', t.date)::date as month,
-  s.category_id,
-  sum(s.amount)::numeric(12,2)      as total
-from public.transaction_splits s
-join public.transactions t on t.id = s.transaction_id
-group by 1, 2;
-
 create or replace view public.account_balances
 with (security_invoker = true) as
 select
@@ -172,11 +140,6 @@ begin
          budget_overrun = v_new_over,
          updated_at     = now()
    where id = v_budget;
-
-  -- Un budget n'a qu'une catégorie : sa part suit toujours son montant
-  update public.transaction_splits
-     set amount = v_new_amount
-   where transaction_id = v_budget;
 end;
 $$;
 
@@ -202,7 +165,7 @@ create trigger transactions_budget_on_delete
   for each row execute function public.transactions_budget_on_delete();
 
 -- ---------------------------------------------------------------------
--- Enregistrement atomique d'une opération et de sa ventilation
+-- Enregistrement atomique d'une opération (avec le calcul des budgets)
 -- ---------------------------------------------------------------------
 create or replace function public.save_transaction(
   p_id         uuid,
@@ -212,7 +175,6 @@ create or replace function public.save_transaction(
   p_amount     numeric,
   p_notes      text,
   p_is_checked boolean,
-  p_splits     jsonb,
   p_is_budget  boolean default false,
   p_budget_id  uuid default null
 )
@@ -223,26 +185,10 @@ set search_path = public
 as $$
 declare
   v_id        uuid;
-  v_splits    jsonb := coalesce(p_splits, '[]'::jsonb);
-  v_sum       numeric;
   v_is_budget boolean := coalesce(p_is_budget, false);
-  v_category  uuid;
 begin
   if not public.is_family_member() then
     raise exception 'Accès refusé';
-  end if;
-
-  select coalesce(sum((s ->> 'amount')::numeric), 0)
-    into v_sum
-    from jsonb_array_elements(v_splits) s;
-
-  if jsonb_array_length(v_splits) > 0 and v_sum <> p_amount then
-    raise exception 'La ventilation (% €) ne correspond pas au montant de l''opération (% €)', v_sum, p_amount;
-  end if;
-
-  -- Un budget porte sur une seule catégorie
-  if v_is_budget and jsonb_array_length(v_splits) <> 1 then
-    raise exception 'Une ligne de budget doit avoir une seule catégorie';
   end if;
 
   if p_budget_id is not null then
@@ -254,12 +200,6 @@ begin
     end if;
     if not exists (select 1 from public.transactions where id = p_budget_id and is_budget) then
       raise exception 'Ligne de budget introuvable';
-    end if;
-    -- Une opération imputée garde la catégorie du budget
-    select category_id into v_category
-      from public.transaction_splits where transaction_id = p_budget_id limit 1;
-    if jsonb_array_length(v_splits) <> 1 or (v_splits -> 0 ->> 'category_id')::uuid is distinct from v_category then
-      raise exception 'Une opération imputée sur un budget doit avoir la catégorie du budget';
     end if;
   end if;
 
@@ -290,24 +230,11 @@ begin
       raise exception 'Opération introuvable';
     end if;
 
-    delete from public.transaction_splits where transaction_id = v_id;
-
     -- Une ligne qui n'est plus un budget libère ses opérations imputées
     if not v_is_budget then
       update public.transactions set budget_id = null where budget_id = v_id;
-    else
-      -- Catégorie du budget modifiée : ses opérations imputées la suivent
-      update public.transaction_splits s
-         set category_id = (v_splits -> 0 ->> 'category_id')::uuid
-        from public.transactions t
-       where t.id = s.transaction_id
-         and t.budget_id = v_id;
     end if;
   end if;
-
-  insert into public.transaction_splits (transaction_id, category_id, amount)
-  select v_id, (s ->> 'category_id')::uuid, (s ->> 'amount')::numeric
-    from jsonb_array_elements(v_splits) s;
 
   -- Retire le nouveau montant du budget
   perform public.budget_apply(v_id, -1);
@@ -321,9 +248,7 @@ $$;
 -- ---------------------------------------------------------------------
 alter table public.family_members     enable row level security;
 alter table public.accounts           enable row level security;
-alter table public.categories         enable row level security;
 alter table public.transactions       enable row level security;
-alter table public.transaction_splits enable row level security;
 
 drop policy if exists "famille lecture" on public.family_members;
 create policy "famille lecture" on public.family_members
@@ -333,22 +258,14 @@ drop policy if exists "famille" on public.accounts;
 create policy "famille" on public.accounts
   for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
 
-drop policy if exists "famille" on public.categories;
-create policy "famille" on public.categories
-  for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
-
 drop policy if exists "famille" on public.transactions;
 create policy "famille" on public.transactions
   for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
 
-drop policy if exists "famille" on public.transaction_splits;
-create policy "famille" on public.transaction_splits
-  for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
-
 -- Les visiteurs non connectés n'ont accès à rien.
 revoke all on all tables in schema public from anon;
-revoke execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, jsonb, boolean, uuid) from anon, public;
-grant  execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, jsonb, boolean, uuid) to authenticated;
+revoke execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, boolean, uuid) from anon, public;
+grant  execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, boolean, uuid) to authenticated;
 revoke execute on function public.budget_apply(uuid, integer) from anon, public;
 grant  execute on function public.budget_apply(uuid, integer) to authenticated;
 revoke execute on function public.is_family_member() from anon, public;
@@ -379,16 +296,6 @@ create table if not exists public.scheduled_transactions (
 create index if not exists scheduled_transactions_next_idx on public.scheduled_transactions (next_date);
 create index if not exists scheduled_transactions_account_idx on public.scheduled_transactions (account_id);
 
-create table if not exists public.scheduled_transaction_splits (
-  id                       uuid primary key default gen_random_uuid(),
-  scheduled_transaction_id uuid not null references public.scheduled_transactions(id) on delete cascade,
-  category_id              uuid not null references public.categories(id) on delete restrict,
-  amount                   numeric(12,2) not null
-);
-create index if not exists scheduled_transaction_splits_st_idx on public.scheduled_transaction_splits (scheduled_transaction_id);
-create index if not exists scheduled_transaction_splits_cat_idx on public.scheduled_transaction_splits (category_id);
-
--- Date suivante : + N mois, en gardant le jour voulu (31 → 28/29/30 selon le mois)
 create or replace function public.schedule_advance(p_date date, p_months integer, p_day integer)
 returns date
 language sql
@@ -399,7 +306,7 @@ as $$
     from (select (date_trunc('month', p_date) + make_interval(months => p_months))::date as m) x;
 $$;
 
--- Enregistrement atomique d'une échéance et de sa ventilation
+-- Enregistrement d'une échéance
 create or replace function public.save_scheduled_transaction(
   p_id               uuid,
   p_account_id       uuid,
@@ -408,7 +315,6 @@ create or replace function public.save_scheduled_transaction(
   p_notes            text,
   p_frequency_months integer,
   p_next_date        date,
-  p_splits           jsonb,
   p_is_budget        boolean default false
 )
 returns uuid
@@ -417,9 +323,7 @@ security invoker
 set search_path = public
 as $$
 declare
-  v_id     uuid;
-  v_splits jsonb := coalesce(p_splits, '[]'::jsonb);
-  v_sum    numeric;
+  v_id uuid;
 begin
   if not public.is_family_member() then
     raise exception 'Accès refusé';
@@ -427,19 +331,6 @@ begin
 
   if p_frequency_months is null or p_frequency_months < 1 then
     raise exception 'La fréquence doit être un nombre de mois supérieur ou égal à 1';
-  end if;
-
-  select coalesce(sum((s ->> 'amount')::numeric), 0)
-    into v_sum
-    from jsonb_array_elements(v_splits) s;
-
-  if jsonb_array_length(v_splits) > 0 and v_sum <> p_amount then
-    raise exception 'La ventilation (% €) ne correspond pas au montant de l''échéance (% €)', v_sum, p_amount;
-  end if;
-
-  -- Un budget porte sur une seule catégorie
-  if coalesce(p_is_budget, false) and jsonb_array_length(v_splits) <> 1 then
-    raise exception 'Une échéance « budget » doit avoir une seule catégorie';
   end if;
 
   if p_id is null then
@@ -465,19 +356,13 @@ begin
     if v_id is null then
       raise exception 'Échéance introuvable';
     end if;
-
-    delete from public.scheduled_transaction_splits where scheduled_transaction_id = v_id;
   end if;
-
-  insert into public.scheduled_transaction_splits (scheduled_transaction_id, category_id, amount)
-  select v_id, (s ->> 'category_id')::uuid, (s ->> 'amount')::numeric
-    from jsonb_array_elements(v_splits) s;
 
   return v_id;
 end;
 $$;
 
--- Crée une opération (avec sa ventilation) pour chaque échéance sélectionnée,
+-- Crée une opération pour chaque échéance sélectionnée,
 -- datée de sa prochaine échéance, puis décale cette date de la fréquence.
 -- Tout est fait en une seule transaction ; renvoie le nombre d'opérations créées.
 create or replace function public.create_transactions_from_schedule(p_ids uuid[])
@@ -488,7 +373,6 @@ set search_path = public
 as $$
 declare
   r      public.scheduled_transactions%rowtype;
-  v_tx   uuid;
   v_n    integer := 0;
 begin
   if not public.is_family_member() then
@@ -503,13 +387,7 @@ begin
        for update
   loop
     insert into public.transactions (account_id, date, label, amount, notes, is_checked, is_budget)
-    values (r.account_id, r.next_date, r.label, r.amount, r.notes, false, r.is_budget)
-    returning id into v_tx;
-
-    insert into public.transaction_splits (transaction_id, category_id, amount)
-    select v_tx, s.category_id, s.amount
-      from public.scheduled_transaction_splits s
-     where s.scheduled_transaction_id = r.id;
+    values (r.account_id, r.next_date, r.label, r.amount, r.notes, false, r.is_budget);
 
     update public.scheduled_transactions
        set next_date  = public.schedule_advance(r.next_date, r.frequency_months, r.day_of_month),
@@ -525,42 +403,22 @@ $$;
 
 -- Sécurité
 alter table public.scheduled_transactions       enable row level security;
-alter table public.scheduled_transaction_splits enable row level security;
 
 drop policy if exists "famille" on public.scheduled_transactions;
 create policy "famille" on public.scheduled_transactions
   for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
 
-drop policy if exists "famille" on public.scheduled_transaction_splits;
-create policy "famille" on public.scheduled_transaction_splits
-  for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
-
-revoke all on public.scheduled_transactions, public.scheduled_transaction_splits from anon;
+revoke all on public.scheduled_transactions from anon;
 revoke execute on function public.schedule_advance(date, integer, integer) from anon, public;
 grant  execute on function public.schedule_advance(date, integer, integer) to authenticated;
-revoke execute on function public.save_scheduled_transaction(uuid, uuid, text, numeric, text, integer, date, jsonb, boolean) from anon, public;
-grant  execute on function public.save_scheduled_transaction(uuid, uuid, text, numeric, text, integer, date, jsonb, boolean) to authenticated;
+revoke execute on function public.save_scheduled_transaction(uuid, uuid, text, numeric, text, integer, date, boolean) from anon, public;
+grant  execute on function public.save_scheduled_transaction(uuid, uuid, text, numeric, text, integer, date, boolean) to authenticated;
 revoke execute on function public.create_transactions_from_schedule(uuid[]) from anon, public;
 grant  execute on function public.create_transactions_from_schedule(uuid[]) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- Données de départ
 -- ---------------------------------------------------------------------
-insert into public.categories (name, color) values
-  ('Banque',       '#475569'),
-  ('Économies',    '#0891b2'),
-  ('Revenus',      '#059669'),
-  ('Maison',       '#0284c7'),
-  ('Voiture',      '#ca8a04'),
-  ('Loisirs',      '#7c3aed'),
-  ('École',        '#2563eb'),
-  ('Impôts',       '#b91c1c'),
-  ('Anniversaire', '#db2777'),
-  ('Noël',         '#15803d'),
-  ('Courses',      '#16a34a'),
-  ('Santé',        '#dc2626')
-on conflict (name) do nothing;
-
 -- Ajoute ici l'adresse e-mail de chaque membre de la famille :
 insert into public.family_members (email, display_name) values
   ('arnaud.rousselle@gmail.com', 'Arnaud')

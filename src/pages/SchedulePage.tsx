@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { createTransactionsFromSchedule, listScheduled } from '../lib/api'
-import { formatDateShort, formatEuro, formatFrequency, isScheduleDue, todayISO } from '../lib/format'
-import { round2 } from '../lib/report'
+import { formatDateShort, formatEuro, formatFrequency, isScheduleDue, todayISO, round2 } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import { useAsync } from '../lib/useAsync'
 import type { ScheduledTransaction } from '../lib/types'
-import { Amount, BudgetBadge, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
+import { Amount, BudgetBadge, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
 import { ScheduleModal } from '../components/ScheduleModal'
 import { IconCheck, IconPlus, IconRepeat } from '../components/Icons'
 
 export function SchedulePage() {
-  const { accountById, categoryById, accounts } = useData()
+  const { accountById, accounts } = useData()
   const { data, loading, error, reload } = useAsync(listScheduled, [])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<ScheduledTransaction | null>(null)
@@ -143,7 +142,6 @@ export function SchedulePage() {
               const isDue = isScheduleDue(i.next_date, today)
               const late = i.next_date < today.slice(0, 8) + '01'
               const account = accountById[i.account_id]
-              const splits = i.scheduled_transaction_splits
               return (
                 <li
                   key={i.id}
@@ -170,17 +168,6 @@ export function SchedulePage() {
                           {formatFrequency(i.frequency_months)}
                         </span>
                         <span className="truncate">{account?.name ?? '?'}</span>
-                        {splits.length === 0 && <span className="text-amber-700">Sans catégorie</span>}
-                        {splits.map((s) => {
-                          const c = categoryById[s.category_id]
-                          return (
-                            <span key={s.id ?? s.category_id} className="inline-flex items-center gap-1">
-                              <CategoryDot color={c?.color ?? '#94a3b8'} className="h-2 w-2" />
-                              {c?.name ?? '?'}
-                              {splits.length > 1 && <span className="text-slate-400 tabular-nums">{formatEuro(Math.abs(s.amount))}</span>}
-                            </span>
-                          )
-                        })}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">

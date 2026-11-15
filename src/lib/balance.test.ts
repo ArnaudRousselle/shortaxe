@@ -23,7 +23,6 @@ function schedule(overrides: Partial<ScheduledTransaction> = {}): ScheduledTrans
     is_budget: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
-    scheduled_transaction_splits: [],
     ...overrides,
   }
 }

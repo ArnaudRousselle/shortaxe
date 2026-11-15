@@ -8,22 +8,6 @@ export type Account = {
   created_at: string
 }
 
-export type Category = {
-  id: string
-  name: string
-  color: string
-  is_archived: boolean
-  created_at: string
-}
-
-export type Split = {
-  id?: string
-  transaction_id?: string
-  category_id: string
-  /** Même signe que l'opération */
-  amount: number
-}
-
 export type Transaction = {
   id: string
   account_id: string
@@ -41,7 +25,6 @@ export type Transaction = {
   budget_overrun: number
   created_at: string
   updated_at: string
-  transaction_splits: Split[]
 }
 
 export type TransactionInput = {
@@ -54,13 +37,6 @@ export type TransactionInput = {
   is_checked: boolean
   is_budget: boolean
   budget_id: string | null
-  splits: { category_id: string; amount: number }[]
-}
-
-export type CategoryMonthlyTotal = {
-  month: string
-  category_id: string
-  total: number
 }
 
 export type AccountBalance = {
@@ -86,7 +62,6 @@ export type ScheduledTransaction = {
   is_budget: boolean
   created_at: string
   updated_at: string
-  scheduled_transaction_splits: Split[]
 }
 
 export type ScheduledTransactionInput = {
@@ -98,5 +73,4 @@ export type ScheduledTransactionInput = {
   frequency_months: number
   next_date: string
   is_budget: boolean
-  splits: { category_id: string; amount: number }[]
 }
