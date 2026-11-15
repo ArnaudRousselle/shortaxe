@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeSplits, type SplitRow } from './splits'
+import { computeSplits, toSingleCategory, type SplitRow } from './splits'
 
 let key = 0
 function row(categoryId: string, value = ''): SplitRow {
@@ -80,5 +80,25 @@ describe('computeSplits', () => {
     const res = computeSplits(1000, [row('alim', '10'), row('loisirs', '0')])
     expect(res.error).toBe('Chaque catégorie doit recevoir un montant non nul.')
     expect(res.remaining).toBe(0)
+  })
+})
+
+describe('toSingleCategory', () => {
+  const key = () => 99
+
+  it('garde seulement la première catégorie, sans montant', () => {
+    const rows = [
+      { key: 1, categoryId: 'c1', value: '30' },
+      { key: 2, categoryId: 'c2', value: '70' },
+    ]
+    expect(toSingleCategory(rows, key)).toEqual([{ key: 1, categoryId: 'c1', value: '' }])
+  })
+
+  it('crée une ligne vide quand il n’y a pas de catégorie', () => {
+    expect(toSingleCategory([], key)).toEqual([{ key: 99, categoryId: '', value: '' }])
+  })
+
+  it('laisse une ligne unique telle quelle (hors montant)', () => {
+    expect(toSingleCategory([{ key: 3, categoryId: 'c3', value: '' }], key)).toEqual([{ key: 3, categoryId: 'c3', value: '' }])
   })
 })

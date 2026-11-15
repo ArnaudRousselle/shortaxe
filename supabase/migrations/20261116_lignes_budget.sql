@@ -6,9 +6,9 @@
 --   - à la création, le montant de l'opération est retiré du budget ;
 --   - à la modification, l'ancien montant est rendu puis le nouveau retiré ;
 --   - à la suppression, le montant est rendu au budget (trigger).
--- La ventilation du budget suit : chaque part de l'opération est retirée de
--- la part du budget de même catégorie ; le reste (catégorie absente du
--- budget, opération sans catégorie) est pris sur la plus grosse part.
+-- Un budget (échéance ou opération) porte sur une seule catégorie, et ses
+-- opérations imputées ont cette même catégorie (elles la suivent si elle
+-- change) : la part du budget est donc toujours égale à son montant.
 -- Un budget ne passe jamais de l'autre côté de zéro : dépassé, il reste à 0
 -- et le dépassement est conservé dans budget_overrun (rendu si on supprime
 -- ou réduit une opération imputée).
@@ -45,13 +45,9 @@ declare
   v_old_amount numeric;
   v_old_over   numeric;
   v_sign       numeric;
-  v_delta      numeric;
   v_raw        numeric;
   v_new_amount numeric;
   v_new_over   numeric;
-  v_rest       numeric;
-  v_target     uuid;
-  s            record;
 begin
   select budget_id, amount into v_budget, v_amount
     from public.transactions where id = p_child;
@@ -72,8 +68,7 @@ begin
   end;
 
   -- Montant « brut » (sans plafond à zéro) après imputation
-  v_delta := p_factor * v_amount;
-  v_raw   := v_old_amount - v_old_over + v_delta;
+  v_raw := v_old_amount - v_old_over + p_factor * v_amount;
 
   if v_raw = 0 or sign(v_raw) = v_sign then
     v_new_amount := v_raw;
@@ -90,62 +85,10 @@ begin
          updated_at     = now()
    where id = v_budget;
 
-  if v_new_amount - v_old_amount = v_delta then
-    -- Cas normal : chaque part est retirée de la part de même catégorie,
-    -- le reste est pris sur la plus grosse part du budget.
-    v_rest := v_amount;
-    for s in
-      select category_id, sum(amount) as amount
-        from public.transaction_splits
-       where transaction_id = p_child
-       group by category_id
-    loop
-      update public.transaction_splits
-         set amount = amount + p_factor * s.amount
-       where id = (
-         select id from public.transaction_splits
-          where transaction_id = v_budget and category_id = s.category_id
-          order by id limit 1
-       );
-      if found then
-        v_rest := v_rest - s.amount;
-      end if;
-    end loop;
-
-    if v_rest <> 0 then
-      select id into v_target
-        from public.transaction_splits
-       where transaction_id = v_budget
-       order by abs(amount) desc, id
-       limit 1;
-      if v_target is not null then
-        update public.transaction_splits
-           set amount = amount + p_factor * v_rest
-         where id = v_target;
-      end if;
-    end if;
-  elsif v_new_amount = 0 then
-    -- Le budget passe à zéro (dépassé) : sa ventilation aussi
-    update public.transaction_splits set amount = 0 where transaction_id = v_budget;
-  else
-    -- Retour sous le plafond depuis un dépassement : le reste revient sur la
-    -- catégorie principale de l'opération si le budget l'a, sinon sur sa
-    -- première part.
-    select b.id into v_target
-      from public.transaction_splits b
-      left join (
-        select category_id, abs(sum(amount)) as weight
-          from public.transaction_splits
-         where transaction_id = p_child
-         group by category_id
-      ) c on c.category_id = b.category_id
-     where b.transaction_id = v_budget
-     order by c.weight desc nulls last, b.id
-     limit 1;
-    update public.transaction_splits
-       set amount = case when id = v_target then v_new_amount else 0 end
-     where transaction_id = v_budget;
-  end if;
+  -- Un budget n'a qu'une catégorie : sa part suit toujours son montant
+  update public.transaction_splits
+     set amount = v_new_amount
+   where transaction_id = v_budget;
 end;
 $$;
 
@@ -195,6 +138,7 @@ declare
   v_splits    jsonb := coalesce(p_splits, '[]'::jsonb);
   v_sum       numeric;
   v_is_budget boolean := coalesce(p_is_budget, false);
+  v_category  uuid;
 begin
   if not public.is_family_member() then
     raise exception 'Accès refusé';
@@ -208,6 +152,11 @@ begin
     raise exception 'La ventilation (% €) ne correspond pas au montant de l''opération (% €)', v_sum, p_amount;
   end if;
 
+  -- Un budget porte sur une seule catégorie
+  if v_is_budget and jsonb_array_length(v_splits) <> 1 then
+    raise exception 'Une ligne de budget doit avoir une seule catégorie';
+  end if;
+
   if p_budget_id is not null then
     if v_is_budget then
       raise exception 'Une ligne de budget ne peut pas être imputée sur un autre budget';
@@ -217,6 +166,12 @@ begin
     end if;
     if not exists (select 1 from public.transactions where id = p_budget_id and is_budget) then
       raise exception 'Ligne de budget introuvable';
+    end if;
+    -- Une opération imputée garde la catégorie du budget
+    select category_id into v_category
+      from public.transaction_splits where transaction_id = p_budget_id limit 1;
+    if jsonb_array_length(v_splits) <> 1 or (v_splits -> 0 ->> 'category_id')::uuid is distinct from v_category then
+      raise exception 'Une opération imputée sur un budget doit avoir la catégorie du budget';
     end if;
   end if;
 
@@ -252,6 +207,13 @@ begin
     -- Une ligne qui n'est plus un budget libère ses opérations imputées
     if not v_is_budget then
       update public.transactions set budget_id = null where budget_id = v_id;
+    else
+      -- Catégorie du budget modifiée : ses opérations imputées la suivent
+      update public.transaction_splits s
+         set category_id = (v_splits -> 0 ->> 'category_id')::uuid
+        from public.transactions t
+       where t.id = s.transaction_id
+         and t.budget_id = v_id;
     end if;
   end if;
 
@@ -304,6 +266,11 @@ begin
 
   if jsonb_array_length(v_splits) > 0 and v_sum <> p_amount then
     raise exception 'La ventilation (% €) ne correspond pas au montant de l''échéance (% €)', v_sum, p_amount;
+  end if;
+
+  -- Un budget porte sur une seule catégorie
+  if coalesce(p_is_budget, false) and jsonb_array_length(v_splits) <> 1 then
+    raise exception 'Une échéance « budget » doit avoir une seule catégorie';
   end if;
 
   if p_id is null then

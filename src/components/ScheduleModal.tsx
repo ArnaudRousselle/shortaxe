@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteScheduled, recentLabels, saveScheduled } from '../lib/api'
 import { centsToInput, parseEuroToCents, todayISO, toCents } from '../lib/format'
-import { computeSplits, type SplitRow } from '../lib/splits'
+import { computeSplits, toSingleCategory, type SplitRow } from '../lib/splits'
 import { errorMessage } from '../lib/supabase'
 import type { ScheduledTransaction } from '../lib/types'
 import { ErrorBanner, Modal, Segmented } from './ui'
@@ -83,6 +83,11 @@ export function ScheduleModal({
   const totalCents = parseEuroToCents(amount)
   const result = useMemo(() => computeSplits(totalCents ?? 0, rows), [totalCents, rows])
 
+  function onBudgetChange(checked: boolean) {
+    setIsBudget(checked)
+    if (checked) setRows((rs) => toSingleCategory(rs, newSplitKey))
+  }
+
   async function onSubmit() {
     setError(null)
     const freq = Number(frequency)
@@ -91,6 +96,7 @@ export function ScheduleModal({
     if (!nextDate) return setError('La date de prochaine échéance est obligatoire.')
     if (!Number.isInteger(freq) || freq < 1 || freq > 120) return setError('La fréquence doit être un nombre entier de mois (de 1 à 120).')
     if (totalCents === null || totalCents <= 0) return setError('Le montant doit être un nombre positif.')
+    if (isBudget && rows.length !== 1) return setError('Un budget porte sur une seule catégorie.')
     if (result.error) return setError(result.error)
     const sign = kind === 'depense' ? -1 : 1
     setBusy(true)
@@ -224,7 +230,14 @@ export function ScheduleModal({
           </div>
         </div>
 
-        <SplitEditor rows={rows} setRows={setRows} totalCents={totalCents} result={result} categories={selectableCategories} />
+        <SplitEditor
+          rows={rows}
+          setRows={setRows}
+          totalCents={totalCents}
+          result={result}
+          categories={selectableCategories}
+          mode={isBudget ? 'single' : 'free'}
+        />
 
         <div>
           <label className="label" htmlFor="st-notes">Note (facultatif)</label>
@@ -232,11 +245,11 @@ export function ScheduleModal({
         </div>
 
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
+          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => onBudgetChange(e.target.checked)} />
           <span>
             Budget
             <span className="block text-xs text-slate-500">
-              Les opérations créées seront des enveloppes : les dépenses imputées dessus en seront déduites.
+              Une seule catégorie. Les opérations créées seront des enveloppes : les dépenses imputées dessus en seront déduites.
             </span>
           </span>
         </label>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteTransaction, recentLabels, saveTransaction } from '../lib/api'
 import { centsToInput, formatEuro, parseEuroToCents, todayISO, toCents } from '../lib/format'
-import { computeSplits, type SplitRow } from '../lib/splits'
+import { computeSplits, toSingleCategory, type SplitRow } from '../lib/splits'
 import { errorMessage } from '../lib/supabase'
 import type { Transaction } from '../lib/types'
 import { ErrorBanner, Modal, Segmented } from './ui'
@@ -32,7 +32,9 @@ export function TransactionModal({
 }) {
   const { accounts, categories } = useData()
   const activeAccounts = accounts.filter((a) => !a.is_archived || a.id === transaction?.account_id)
-  const usedCategoryIds = new Set(transaction?.transaction_splits.map((s) => s.category_id) ?? [])
+  const usedCategoryIds = new Set(
+    [...(transaction?.transaction_splits ?? []), ...(budget?.transaction_splits ?? [])].map((s) => s.category_id),
+  )
   const selectableCategories = categories.filter((c) => !c.is_archived || usedCategoryIds.has(c.id))
 
   const [kind, setKind] = useState<Kind>('depense')
@@ -92,12 +94,18 @@ export function TransactionModal({
   const totalCents = parseEuroToCents(amount)
   const result = useMemo(() => computeSplits(totalCents ?? 0, rows), [totalCents, rows])
 
+  function onBudgetChange(checked: boolean) {
+    setIsBudget(checked)
+    if (checked) setRows((rs) => toSingleCategory(rs, newSplitKey))
+  }
+
   async function onSubmit() {
     setError(null)
     if (!accountId) return setError('Choisis un compte.')
     if (!label.trim()) return setError('Le libellé est obligatoire.')
     if (!date) return setError('La date est obligatoire.')
     if (totalCents === null || totalCents <= 0) return setError('Le montant doit être un nombre positif.')
+    if (isBudget && !budgetId && rows.length !== 1) return setError('Un budget porte sur une seule catégorie.')
     if (result.error) return setError(result.error)
     if (
       transaction?.is_budget &&
@@ -237,6 +245,7 @@ export function TransactionModal({
           totalCents={totalCents}
           result={result}
           categories={selectableCategories}
+          mode={budgetId ? 'locked' : isBudget ? 'single' : 'free'}
         />
 
         <div>
@@ -251,11 +260,11 @@ export function TransactionModal({
 
         {!budgetId && (
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
+            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => onBudgetChange(e.target.checked)} />
             <span>
               Budget
               <span className="block text-xs text-slate-500">
-                Enveloppe : les opérations ajoutées avec le bouton « + » de la ligne en seront déduites.
+                Une seule catégorie. Enveloppe : les opérations ajoutées avec le bouton « + » de la ligne en seront déduites.
               </span>
             </span>
           </label>
