@@ -8,6 +8,7 @@ import type { Transaction } from '../lib/types'
 import { Amount, EmptyState, ErrorBanner, Loading, MonthPicker, PageHeader, Segmented, YearPicker } from '../components/ui'
 import { TransactionModal } from '../components/TransactionModal'
 import { TransactionRow } from '../components/TransactionRow'
+import { BudgetChildrenModal } from '../components/BudgetChildrenModal'
 import { IconPlus, IconSearch } from '../components/Icons'
 
 type Period = 'mois' | 'annee'
@@ -26,6 +27,8 @@ export function TransactionsPage() {
   const [creating, setCreating] = useState(false)
   // Ligne de budget pré-remplie dans la nouvelle opération (bouton « + »)
   const [budgetParent, setBudgetParent] = useState<Transaction | null>(null)
+  // Ligne de budget dont on affiche les opérations rattachées (bouton « œil »)
+  const [viewingBudget, setViewingBudget] = useState<Transaction | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const from = period === 'mois' ? month : yearStart(year)
@@ -163,6 +166,7 @@ export function TransactionsPage() {
                     onClick={() => setEditing(t)}
                     onToggleChecked={() => void toggleChecked(t)}
                     onAddToBudget={t.is_budget ? () => addToBudget(t) : undefined}
+                    onShowBudgetChildren={t.is_budget ? () => setViewingBudget(t) : undefined}
                   />
                 ))}
               </ul>
@@ -179,6 +183,8 @@ export function TransactionsPage() {
       >
         <IconPlus className="h-7 w-7" />
       </button>
+
+      <BudgetChildrenModal budget={viewingBudget} onClose={() => setViewingBudget(null)} />
 
       <TransactionModal
         open={creating || editing !== null}

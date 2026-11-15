@@ -12,12 +12,14 @@ export type Account = {
 export type BudgetAllocation = {
   budget_id: string
   amount: number
-  /** Ligne de budget (libellé), jointe à la lecture */
-  budget?: { label: string } | null
+  /** Ligne de budget (numéro et libellé), jointe à la lecture */
+  budget?: { ref: number; label: string } | null
 }
 
 export type Transaction = {
   id: string
+  /** Numéro court unique, attribué par la base (« #12 ») */
+  ref: number
   /** Aucun compte pour une ligne de budget */
   account_id: string | null
   date: string // YYYY-MM-DD
@@ -37,7 +39,14 @@ export type Transaction = {
 }
 
 /** Ligne de budget proposée dans le formulaire de répartition */
-export type BudgetLine = Pick<Transaction, 'id' | 'label' | 'date' | 'amount' | 'budget_overrun'>
+export type BudgetLine = Pick<Transaction, 'id' | 'ref' | 'label' | 'date' | 'amount' | 'budget_overrun'>
+
+/** Opération rattachée à une ligne de budget, avec la part imputée sur ce budget */
+export type BudgetChild = {
+  /** Part imputée sur le budget (même signe que l'opération) */
+  amount: number
+  transaction: Pick<Transaction, 'id' | 'ref' | 'account_id' | 'date' | 'label' | 'amount' | 'is_checked'>
+}
 
 export type TransactionInput = {
   id: string | null
