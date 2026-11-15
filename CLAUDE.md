@@ -1,6 +1,6 @@
 # CLAUDE.md — Shortaxe
 
-Application web de gestion des comptes de la famille (plusieurs comptes bancaires, opérations ventilées par catégorie, budgets mensuels, échéancier, rapports, évolution du solde, export JSON). Le README détaille les fonctionnalités et la mise en route.
+Application web de gestion des comptes de la famille (plusieurs comptes bancaires, opérations ventilées par catégorie, budgets annuels, échéancier, rapports, évolution du solde, export JSON). Le README détaille les fonctionnalités et la mise en route.
 
 ## Stack
 
@@ -59,6 +59,7 @@ supabase/
 **Logique métier**
 - Les calculs (rapports, prévision du solde, ventilation, dates) vont dans `src/lib`, sous forme de fonctions pures testées dans un `*.test.ts` voisin.
 - Tout changement de logique dans `src/lib` s'accompagne de tests.
+- Budgets : saisis par année et par catégorie, stockés dans `budgets` répartis sur les 12 mois (`spreadAnnualCents` dans `src/lib/budget.ts`, appelé par `saveYearBudgets`). Le budget annuel affiché = somme des 12 mois.
 - La projection de l'échéancier côté front (`advanceSchedule` dans `balance.ts`) doit suivre la même règle de jour du mois que la fonction SQL `schedule_advance`.
 
 **Interface**

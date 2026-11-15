@@ -83,7 +83,8 @@ create index if not exists transaction_splits_tx_idx on public.transaction_split
 create index if not exists transaction_splits_cat_idx on public.transaction_splits (category_id);
 
 -- ---------------------------------------------------------------------
--- Budgets mensuels par catégorie (month = 1er jour du mois)
+-- Budgets par catégorie (month = 1er jour du mois). L'application saisit
+-- un budget annuel et le répartit à parts égales sur les 12 mois.
 -- ---------------------------------------------------------------------
 create table if not exists public.budgets (
   id          uuid primary key default gen_random_uuid(),

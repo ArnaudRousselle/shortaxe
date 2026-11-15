@@ -1,3 +1,5 @@
+import { spreadAnnualCents } from './budget'
+import { fromCents, monthsOfYear, toCents } from './format'
 import { supabase } from './supabase'
 import type {
   Account,
@@ -211,17 +213,31 @@ export async function listBudgets(from: string, to: string): Promise<Budget[]> {
   return rows.map((b) => ({ ...b, amount: num(b.amount) }))
 }
 
-/** Enregistre les budgets d'un ou plusieurs mois. amount = null supprime le budget. */
-export async function upsertBudgets(
-  rows: { category_id: string; month: string; amount: number | null }[],
-): Promise<void> {
-  const toUpsert = rows.filter((r) => r.amount !== null) as { category_id: string; month: string; amount: number }[]
-  const toDelete = rows.filter((r) => r.amount === null)
+/**
+ * Enregistre les budgets annuels d'une année : chaque montant est réparti sur les 12 mois.
+ * amount = null supprime le budget de la catégorie pour toute l'année.
+ */
+export async function saveYearBudgets(year: number, rows: { category_id: string; amount: number | null }[]): Promise<void> {
+  const months = monthsOfYear(year)
+  const toUpsert = rows
+    .filter((r) => r.amount !== null)
+    .flatMap((r) => {
+      const parts = spreadAnnualCents(toCents(r.amount as number))
+      return months.map((month, i) => ({ category_id: r.category_id, month, amount: fromCents(parts[i]) }))
+    })
+  const toDelete = rows.filter((r) => r.amount === null).map((r) => r.category_id)
   if (toUpsert.length) {
     check(await supabase.from('budgets').upsert(toUpsert, { onConflict: 'category_id,month' }))
   }
-  for (const r of toDelete) {
-    check(await supabase.from('budgets').delete().eq('category_id', r.category_id).eq('month', r.month))
+  if (toDelete.length) {
+    check(
+      await supabase
+        .from('budgets')
+        .delete()
+        .in('category_id', toDelete)
+        .gte('month', months[0])
+        .lt('month', `${year + 1}-01-01`),
+    )
   }
 }
 
