@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteTransaction, recentLabels, saveTransaction } from '../lib/api'
-import { centsToInput, parseEuroToCents, todayISO, toCents } from '../lib/format'
+import { centsToInput, formatEuro, parseEuroToCents, todayISO, toCents } from '../lib/format'
 import { computeSplits, type SplitRow } from '../lib/splits'
 import { errorMessage } from '../lib/supabase'
 import type { Transaction } from '../lib/types'
@@ -14,12 +14,18 @@ type Row = SplitRow
 export function TransactionModal({
   open,
   transaction,
+  budget,
   defaultAccountId,
   onClose,
   onSaved,
 }: {
   open: boolean
   transaction: Transaction | null
+  /**
+   * Ligne de budget : en création, la nouvelle opération y sera imputée ;
+   * en modification, budget sur lequel l'opération est déjà imputée (affichage).
+   */
+  budget?: Transaction | null
   defaultAccountId?: string
   onClose: () => void
   onSaved: () => void
@@ -36,6 +42,7 @@ export function TransactionModal({
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [isChecked, setIsChecked] = useState(false)
+  const [isBudget, setIsBudget] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
   const [labels, setLabels] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -54,6 +61,7 @@ export function TransactionModal({
       setAmount(centsToInput(total))
       setNotes(transaction.notes ?? '')
       setIsChecked(transaction.is_checked)
+      setIsBudget(transaction.is_budget)
       setRows(
         transaction.transaction_splits.map((s) => ({
           key: newSplitKey(),
@@ -62,18 +70,24 @@ export function TransactionModal({
         })),
       )
     } else {
-      setKind('depense')
-      setAccountId(defaultAccountId || activeAccounts[0]?.id || '')
+      setKind(budget && budget.amount > 0 ? 'recette' : 'depense')
+      setAccountId(budget?.account_id || defaultAccountId || activeAccounts[0]?.id || '')
       setDate(todayISO())
       setLabel('')
       setAmount('')
       setNotes('')
       setIsChecked(false)
-      setRows([{ key: newSplitKey(), categoryId: '', value: '' }])
+      setIsBudget(false)
+      // Opération imputée sur un budget : catégorie du budget proposée par défaut
+      setRows([{ key: newSplitKey(), categoryId: budget?.transaction_splits[0]?.category_id ?? '', value: '' }])
     }
     recentLabels().then(setLabels).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, transaction])
+
+  // Opération imputée sur un budget (nouvelle ou existante)
+  const budgetId = transaction ? transaction.budget_id : (budget?.id ?? null)
+  const linkedBudget = budget && budget.id === budgetId ? budget : null
 
   const totalCents = parseEuroToCents(amount)
   const result = useMemo(() => computeSplits(totalCents ?? 0, rows), [totalCents, rows])
@@ -85,6 +99,12 @@ export function TransactionModal({
     if (!date) return setError('La date est obligatoire.')
     if (totalCents === null || totalCents <= 0) return setError('Le montant doit être un nombre positif.')
     if (result.error) return setError(result.error)
+    if (
+      transaction?.is_budget &&
+      !isBudget &&
+      !confirm('Cette ligne ne sera plus un budget : les opérations imputées dessus n’y seront plus rattachées. Continuer ?')
+    )
+      return
     const sign = kind === 'depense' ? -1 : 1
     setBusy(true)
     try {
@@ -96,6 +116,8 @@ export function TransactionModal({
         amount: (sign * totalCents) / 100,
         notes: notes.trim() || null,
         is_checked: isChecked,
+        is_budget: budgetId ? false : isBudget,
+        budget_id: budgetId,
         splits: result.splits.map((s) => ({ category_id: s.categoryId, amount: (sign * s.cents) / 100 })),
       })
       onSaved()
@@ -108,7 +130,12 @@ export function TransactionModal({
 
   async function onDelete() {
     if (!transaction) return
-    if (!confirm(`Supprimer l’opération « ${transaction.label} » ?`)) return
+    const detail = transaction.budget_id
+      ? '\n\nSon montant sera rendu au budget.'
+      : transaction.is_budget
+        ? '\n\nLes opérations imputées sur ce budget sont conservées.'
+        : ''
+    if (!confirm(`Supprimer l’opération « ${transaction.label} » ?${detail}`)) return
     setBusy(true)
     try {
       await deleteTransaction(transaction.id)
@@ -137,6 +164,19 @@ export function TransactionModal({
       }
     >
       <div className="space-y-4">
+        {budgetId && (
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            {linkedBudget ? (
+              <>
+                Imputée sur le budget <strong>« {linkedBudget.label} »</strong> — reste {formatEuro(Math.abs(linkedBudget.amount))}
+                {linkedBudget.amount * (kind === 'depense' ? -1 : 1) < 0 && ' (dépassé)'}
+              </>
+            ) : (
+              'Opération imputée sur une ligne de budget.'
+            )}
+          </p>
+        )}
+
         <Segmented<Kind>
           value={kind}
           onChange={setKind}
@@ -200,6 +240,18 @@ export function TransactionModal({
           <input type="checkbox" className="h-4 w-4" checked={isChecked} onChange={(e) => setIsChecked(e.target.checked)} />
           Opération pointée (visible sur le relevé bancaire)
         </label>
+
+        {!budgetId && (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
+            <span>
+              Budget
+              <span className="block text-xs text-slate-500">
+                Enveloppe : les opérations ajoutées avec le bouton « + » de la ligne en seront déduites.
+              </span>
+            </span>
+          </label>
+        )}
 
         <ErrorBanner message={error} />
       </div>

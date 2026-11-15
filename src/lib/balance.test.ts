@@ -20,6 +20,7 @@ function schedule(overrides: Partial<ScheduledTransaction> = {}): ScheduledTrans
     frequency_months: 1,
     next_date: '2026-11-05',
     day_of_month: 5,
+    is_budget: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     scheduled_transaction_splits: [],

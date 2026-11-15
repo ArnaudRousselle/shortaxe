@@ -6,7 +6,7 @@ import { round2 } from '../lib/report'
 import { errorMessage } from '../lib/supabase'
 import { useAsync } from '../lib/useAsync'
 import type { ScheduledTransaction } from '../lib/types'
-import { Amount, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
+import { Amount, BudgetBadge, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
 import { ScheduleModal } from '../components/ScheduleModal'
 import { IconCheck, IconPlus, IconRepeat } from '../components/Icons'
 
@@ -149,7 +149,7 @@ export function SchedulePage() {
                   key={i.id}
                   className={`flex items-center gap-3 border-l-4 px-3 py-2.5 sm:px-4 ${
                     isDue ? 'border-l-orange-500 bg-orange-50 hover:bg-orange-100' : 'border-l-transparent hover:bg-slate-50'
-                  }`}
+                  } ${i.is_budget ? 'text-slate-400' : ''}`}
                 >
                   <input
                     type="checkbox"
@@ -160,8 +160,11 @@ export function SchedulePage() {
                   />
                   <button onClick={() => setEditing(i)} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
                     <div className="min-w-0">
-                      <p className={`truncate font-medium ${isDue ? 'text-orange-900' : ''}`}>{i.label}</p>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <p className={`truncate font-medium ${i.is_budget ? 'text-slate-400' : isDue ? 'text-orange-900' : ''}`}>
+                        {i.label}
+                        {i.is_budget && <BudgetBadge />}
+                      </p>
+                      <div className={`mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${i.is_budget ? 'text-slate-400' : 'text-slate-500'}`}>
                         <span className="inline-flex items-center gap-1">
                           <IconRepeat className="h-3.5 w-3.5" />
                           {formatFrequency(i.frequency_months)}
@@ -181,7 +184,7 @@ export function SchedulePage() {
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <Amount value={i.amount} className="font-semibold" />
+                      <Amount value={i.amount} muted={i.is_budget} className="font-semibold" />
                       <p className={`text-xs tabular-nums ${isDue ? 'font-semibold text-orange-700' : 'text-slate-500'}`}>
                         {formatDateShort(i.next_date)}
                         {late && ' · en retard'}
