@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
-import { getCategoryTotals, listBudgets, listScheduled, saveYearBudgets } from '../lib/api'
-import { annualBudgetsByCategory, budgetsFromSchedule } from '../lib/budget'
+import { getCategoryTotals, listAnnualBudgets, listScheduled, saveAnnualBudgets } from '../lib/api'
+import { fullBudgetFromSchedule } from '../lib/budget'
 import { centsToInput, formatEuro, parseEuroToCents, toCents, yearStart } from '../lib/format'
 import { round2 } from '../lib/report'
 import { errorMessage } from '../lib/supabase'
@@ -19,12 +19,16 @@ export function BudgetsPage() {
   const load = useCallback(async () => {
     const from = yearStart(year)
     const to = yearStart(year + 1)
-    const [budgets, totals] = await Promise.all([listBudgets(from, to), getCategoryTotals(from, to)])
+    const [budgets, totals] = await Promise.all([listAnnualBudgets(year), getCategoryTotals(from, to)])
     return { budgets, totals }
   }, [year])
   const { data, loading, error, reload } = useAsync(load, [load])
 
-  const saved = useMemo(() => annualBudgetsByCategory(data?.budgets ?? [], year), [data, year])
+  const saved = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const b of data?.budgets ?? []) m[b.category_id] = b.amount
+    return m
+  }, [data])
 
   const spent = useMemo(() => {
     const m: Record<string, number> = {}
@@ -70,7 +74,7 @@ export function BudgetsPage() {
     setBusy(true)
     setActionError(null)
     try {
-      await saveYearBudgets(year, changes)
+      await saveAnnualBudgets(year, changes)
       await reload()
       setInfo(`Budget ${year} enregistré.`)
     } catch (e) {
@@ -82,25 +86,27 @@ export function BudgetsPage() {
 
   async function computeFromSchedule() {
     setActionError(null)
+    if (
+      !confirm(
+        `Calculer le budget ${year} à partir de l’échéancier ?\n\n` +
+          'Tous les montants du budget seront remplacés. Les catégories absentes de l’échéancier seront mises à 0.\n\n' +
+          'Rien n’est enregistré tant que tu ne cliques pas sur « Enregistrer ».',
+      )
+    )
+      return
     setBusy(true)
     try {
-      const computed = budgetsFromSchedule(await listScheduled(), year)
-      const ids = Object.keys(computed)
-      if (ids.length === 0) return setInfo(`Aucune dépense de l’échéancier ne tombe en ${year}.`)
-      const names = categories.filter((c) => ids.includes(c.id)).map((c) => c.name)
-      if (
-        !confirm(
-          `Calculer le budget ${year} à partir de l’échéancier ?\n\n` +
-            `Les montants actuels de ces catégories seront remplacés : ${names.join(', ')}.\n\n` +
-            'Les autres catégories ne sont pas modifiées. Rien n’est enregistré tant que tu ne cliques pas sur « Enregistrer ».',
-        )
-      )
-        return
-      const d = { ...draft }
+      const computed = fullBudgetFromSchedule(await listScheduled(), year, visibleCategories.map((c) => c.id))
+      const d: Record<string, string> = {}
       for (const [id, amount] of Object.entries(computed)) d[id] = centsToInput(toCents(amount))
       setDraft(d)
+      const filled = Object.values(computed).filter((v) => v > 0).length
       const total = round2(Object.values(computed).reduce((s, v) => s + v, 0))
-      setInfo(`Budget calculé à partir de l’échéancier : ${formatEuro(total)} sur ${ids.length} catégorie${ids.length > 1 ? 's' : ''}. Vérifie puis enregistre.`)
+      setInfo(
+        filled === 0
+          ? `Aucune dépense de l’échéancier ne tombe en ${year} : toutes les catégories sont à 0. Vérifie puis enregistre.`
+          : `Budget calculé à partir de l’échéancier : ${formatEuro(total)} sur ${filled} catégorie${filled > 1 ? 's' : ''}, les autres à 0. Vérifie puis enregistre.`,
+      )
     } catch (e) {
       setActionError(errorMessage(e))
     } finally {
@@ -197,7 +203,7 @@ export function BudgetsPage() {
         </div>
       )}
       <p className="mt-3 text-xs text-slate-500">
-        Le budget est annuel ; il est réparti à parts égales sur les 12 mois pour l’accueil et les rapports mensuels.
+        Le budget est annuel ; l’accueil et les rapports mensuels en utilisent un douzième par mois.
         « Dépensé » correspond aux dépenses moins les remboursements ventilés sur la catégorie pendant l’année. Laisser un budget vide le supprime.
       </p>
     </>

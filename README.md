@@ -87,7 +87,7 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 | `categories` | Catégories personnalisables (nom, couleur, archivée) |
 | `transactions` | Opérations : montant **négatif = dépense**, **positif = recette** |
 | `transaction_splits` | Ventilation d'une opération par catégorie (même signe que l'opération) |
-| `budgets` | Budget d'une catégorie pour un mois (`month` = 1er du mois) : le budget annuel saisi est réparti à parts égales sur les 12 mois |
+| `annual_budgets` | Budget d'une catégorie pour une année (l'accueil et les rapports mensuels en utilisent un douzième par mois) |
 | `scheduled_transactions` | Échéancier : modèle d'opération + `frequency_months` (1 = tous les mois, 12 = tous les ans) + `next_date` |
 | `scheduled_transaction_splits` | Ventilation d'une échéance par catégorie |
 | `family_members` | E-mails autorisés à accéder aux données |
@@ -99,7 +99,7 @@ L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas
 
 **Évolutions du schéma** : pour une base déjà installée, exécuter dans le SQL Editor les fichiers de `supabase/migrations/` qui n'ont pas encore été appliqués (`schema.sql` contient toujours le schéma complet pour une nouvelle installation).
 
-**Budget calculé à partir de l'échéancier** : pour l'année choisie, chaque échéance est comptée autant de fois qu'elle tombe dans l'année civile (selon sa fréquence et sa prochaine date, que les opérations aient déjà été créées ou non) ; les montants sont regroupés par catégorie (dépenses moins recettes ventilées). Seules les catégories concernées sont remplacées, après confirmation, et rien n'est enregistré avant « Enregistrer ».
+**Budget calculé à partir de l'échéancier** : pour l'année choisie, chaque échéance est comptée autant de fois qu'elle tombe dans l'année civile (selon sa fréquence et sa prochaine date, que les opérations aient déjà été créées ou non) ; les montants sont regroupés par catégorie (dépenses moins recettes ventilées). Après confirmation, tout le budget de l'année est remplacé : les catégories absentes de l'échéancier passent à 0. Rien n'est enregistré avant « Enregistrer ».
 
 Le « dépensé » d'une catégorie correspond aux dépenses moins les remboursements ventilés sur cette catégorie. Une opération sans catégorie (par exemple un virement entre deux comptes) n'entre dans aucun budget.
 

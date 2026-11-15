@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { annualBudgetsByCategory, budgetsFromSchedule, scheduleOccurrencesInYear, spreadAnnualCents } from './budget'
+import { budgetsFromSchedule, fullBudgetFromSchedule, monthlyBudgetsFromAnnual, scheduleOccurrencesInYear, spreadAnnualCents } from './budget'
 import type { ScheduledTransaction } from './types'
 
 function schedule(
@@ -39,18 +39,31 @@ describe('spreadAnnualCents', () => {
   })
 })
 
-describe('annualBudgetsByCategory', () => {
-  it('additionne les mois de l’année demandée seulement', () => {
-    const out = annualBudgetsByCategory(
-      [
-        { category_id: 'a', month: '2026-01-01', amount: 83.34 },
-        { category_id: 'a', month: '2026-02-01', amount: 83.33 },
-        { category_id: 'b', month: '2026-12-01', amount: 500 },
-        { category_id: 'a', month: '2027-01-01', amount: 999 },
-      ],
-      2026,
-    )
-    expect(out).toEqual({ a: 166.67, b: 500 })
+describe('monthlyBudgetsFromAnnual', () => {
+  const annual = [
+    { id: 'b1', category_id: 'a', year: 2026, amount: 1000 },
+    { id: 'b2', category_id: 'b', year: 2026, amount: 0 },
+    { id: 'b3', category_id: 'a', year: 2027, amount: 120 },
+  ]
+
+  it('répartit chaque budget annuel sur ses 12 mois', () => {
+    const rows = monthlyBudgetsFromAnnual(annual, '2026-01-01', '2027-01-01')
+    expect(rows).toHaveLength(12)
+    expect(rows[0]).toEqual({ id: 'b1-2026-01-01', category_id: 'a', month: '2026-01-01', amount: 83.34 })
+    expect(rows[11]).toMatchObject({ month: '2026-12-01', amount: 83.33 })
+    expect(Math.round(rows.reduce((s, r) => s + r.amount * 100, 0))).toBe(100_000)
+  })
+
+  it('ne garde que les mois demandés, à cheval sur deux années', () => {
+    const rows = monthlyBudgetsFromAnnual(annual, '2026-12-01', '2027-02-01')
+    expect(rows.map((r) => [r.month, r.amount])).toEqual([
+      ['2026-12-01', 83.33],
+      ['2027-01-01', 10],
+    ])
+  })
+
+  it('ignore les budgets à 0', () => {
+    expect(monthlyBudgetsFromAnnual(annual, '2026-01-01', '2026-02-01').map((r) => r.category_id)).toEqual(['a'])
   })
 })
 
@@ -114,5 +127,19 @@ describe('budgetsFromSchedule', () => {
   it('évite les erreurs d’arrondi', () => {
     const out = budgetsFromSchedule([schedule('2026-01-01', 1, [{ category_id: 'x', amount: -0.1 }])], 2026)
     expect(out).toEqual({ x: 1.2 })
+  })
+})
+
+describe('fullBudgetFromSchedule', () => {
+  it('met à 0 les catégories absentes de l’échéancier ou en recette nette', () => {
+    const out = fullBudgetFromSchedule(
+      [
+        schedule('2026-11-05', 1, [{ category_id: 'maison', amount: -800 }]),
+        schedule('2026-11-01', 1, [{ category_id: 'revenus', amount: 2500 }]),
+      ],
+      2027,
+      ['maison', 'revenus', 'courses'],
+    )
+    expect(out).toEqual({ maison: 9600, revenus: 0, courses: 0 })
   })
 })

@@ -83,17 +83,16 @@ create index if not exists transaction_splits_tx_idx on public.transaction_split
 create index if not exists transaction_splits_cat_idx on public.transaction_splits (category_id);
 
 -- ---------------------------------------------------------------------
--- Budgets par catégorie (month = 1er jour du mois). L'application saisit
--- un budget annuel et le répartit à parts égales sur les 12 mois.
+-- Budgets annuels par catégorie
 -- ---------------------------------------------------------------------
-create table if not exists public.budgets (
+create table if not exists public.annual_budgets (
   id          uuid primary key default gen_random_uuid(),
   category_id uuid not null references public.categories(id) on delete cascade,
-  month       date not null check (extract(day from month) = 1),
+  year        smallint not null check (year between 2000 and 2100),
   amount      numeric(12,2) not null check (amount >= 0),
-  unique (category_id, month)
+  unique (category_id, year)
 );
-create index if not exists budgets_month_idx on public.budgets (month);
+create index if not exists annual_budgets_year_idx on public.annual_budgets (year);
 
 -- ---------------------------------------------------------------------
 -- Vues de reporting (respectent la sécurité de l'utilisateur connecté)
@@ -192,7 +191,7 @@ alter table public.accounts           enable row level security;
 alter table public.categories         enable row level security;
 alter table public.transactions       enable row level security;
 alter table public.transaction_splits enable row level security;
-alter table public.budgets            enable row level security;
+alter table public.annual_budgets     enable row level security;
 
 drop policy if exists "famille lecture" on public.family_members;
 create policy "famille lecture" on public.family_members
@@ -214,8 +213,8 @@ drop policy if exists "famille" on public.transaction_splits;
 create policy "famille" on public.transaction_splits
   for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
 
-drop policy if exists "famille" on public.budgets;
-create policy "famille" on public.budgets
+drop policy if exists "famille" on public.annual_budgets;
+create policy "famille" on public.annual_budgets
   for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
 
 -- Les visiteurs non connectés n'ont accès à rien.
