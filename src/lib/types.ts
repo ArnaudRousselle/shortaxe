@@ -49,6 +49,15 @@ export type TransactionInput = {
   splits: { category_id: string; amount: number }[]
 }
 
+/** Budget d'une catégorie pour une année (table annual_budgets) */
+export type AnnualBudget = {
+  id: string
+  category_id: string
+  year: number
+  amount: number
+}
+
+/** Part mensuelle d'un budget annuel (calculée, non stockée) */
 export type Budget = {
   id: string
   category_id: string

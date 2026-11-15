@@ -1,25 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
-import { getCategoryTotals, listBudgets, upsertBudgets } from '../lib/api'
-import { addMonths, centsToInput, currentMonth, formatMonth, formatMonthShort, parseEuroToCents, toCents } from '../lib/format'
+import { getCategoryTotals, listAnnualBudgets, listScheduled, saveAnnualBudgets } from '../lib/api'
+import { fullBudgetFromSchedule } from '../lib/budget'
+import { centsToInput, formatEuro, parseEuroToCents, toCents, yearStart } from '../lib/format'
 import { round2 } from '../lib/report'
 import { errorMessage } from '../lib/supabase'
 import { useAsync } from '../lib/useAsync'
-import { Amount, BudgetBar, CategoryDot, EmptyState, ErrorBanner, Loading, MonthPicker, PageHeader } from '../components/ui'
+import { Amount, BudgetBar, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader, YearPicker } from '../components/ui'
 
 export function BudgetsPage() {
   const { categories } = useData()
-  const [month, setMonth] = useState(currentMonth())
+  const [year, setYear] = useState(new Date().getFullYear())
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const next = addMonths(month, 1)
-    const [budgets, totals] = await Promise.all([listBudgets(month, next), getCategoryTotals(month, next)])
+    const from = yearStart(year)
+    const to = yearStart(year + 1)
+    const [budgets, totals] = await Promise.all([listAnnualBudgets(year), getCategoryTotals(from, to)])
     return { budgets, totals }
-  }, [month])
+  }, [year])
   const { data, loading, error, reload } = useAsync(load, [load])
 
   const saved = useMemo(() => {
@@ -34,7 +36,7 @@ export function BudgetsPage() {
     return m
   }, [data])
 
-  // Réinitialise le brouillon quand les données du mois changent
+  // Réinitialise le brouillon quand les données de l'année changent
   useEffect(() => {
     const d: Record<string, string> = {}
     for (const [id, amount] of Object.entries(saved)) d[id] = centsToInput(toCents(amount))
@@ -61,7 +63,7 @@ export function BudgetsPage() {
 
   const changes = visibleCategories
     .filter((c) => parsed[c.id] !== 'invalid' && (parsed[c.id] ?? null) !== (saved[c.id] ?? null))
-    .map((c) => ({ category_id: c.id, month, amount: parsed[c.id] as number | null }))
+    .map((c) => ({ category_id: c.id, amount: parsed[c.id] as number | null }))
   const hasInvalid = Object.values(parsed).includes('invalid')
 
   const totalBudget = round2(visibleCategories.reduce((s, c) => s + (typeof parsed[c.id] === 'number' ? (parsed[c.id] as number) : 0), 0))
@@ -72,9 +74,9 @@ export function BudgetsPage() {
     setBusy(true)
     setActionError(null)
     try {
-      await upsertBudgets(changes)
+      await saveAnnualBudgets(year, changes)
       await reload()
-      setInfo('Budgets enregistrés.')
+      setInfo(`Budget ${year} enregistré.`)
     } catch (e) {
       setActionError(errorMessage(e))
     } finally {
@@ -82,42 +84,29 @@ export function BudgetsPage() {
     }
   }
 
-  async function copyPrevious() {
+  async function computeFromSchedule() {
     setActionError(null)
-    try {
-      const prev = addMonths(month, -1)
-      const rows = await listBudgets(prev, month)
-      if (rows.length === 0) return setInfo(`Aucun budget défini en ${formatMonth(prev).toLowerCase()}.`)
-      const d: Record<string, string> = {}
-      for (const r of rows) d[r.category_id] = centsToInput(toCents(r.amount))
-      setDraft(d)
-      setInfo(`Budgets de ${formatMonth(prev).toLowerCase()} recopiés. Pense à enregistrer.`)
-    } catch (e) {
-      setActionError(errorMessage(e))
-    }
-  }
-
-  async function applyToRestOfYear() {
-    if (hasInvalid) return setActionError('Certains montants sont invalides.')
-    const year = month.slice(0, 4)
-    const months: string[] = []
-    for (let m = month; m.slice(0, 4) === year; m = addMonths(m, 1)) months.push(m)
-    const last = months[months.length - 1]
     if (
       !confirm(
-        `Appliquer ces budgets de ${formatMonthShort(month).toLowerCase()} à ${formatMonthShort(last).toLowerCase()} ${year} ? Les budgets déjà définis sur ces mois seront remplacés.`,
+        `Calculer le budget ${year} à partir de l’échéancier ?\n\n` +
+          'Tous les montants du budget seront remplacés. Les catégories absentes de l’échéancier seront mises à 0.\n\n' +
+          'Rien n’est enregistré tant que tu ne cliques pas sur « Enregistrer ».',
       )
     )
       return
     setBusy(true)
-    setActionError(null)
     try {
-      const rows = months.flatMap((m) =>
-        visibleCategories.map((c) => ({ category_id: c.id, month: m, amount: parsed[c.id] as number | null })),
+      const computed = fullBudgetFromSchedule(await listScheduled(), year, visibleCategories.map((c) => c.id))
+      const d: Record<string, string> = {}
+      for (const [id, amount] of Object.entries(computed)) d[id] = centsToInput(toCents(amount))
+      setDraft(d)
+      const filled = Object.values(computed).filter((v) => v > 0).length
+      const total = round2(Object.values(computed).reduce((s, v) => s + v, 0))
+      setInfo(
+        filled === 0
+          ? `Aucune dépense de l’échéancier ne tombe en ${year} : toutes les catégories sont à 0. Vérifie puis enregistre.`
+          : `Budget calculé à partir de l’échéancier : ${formatEuro(total)} sur ${filled} catégorie${filled > 1 ? 's' : ''}, les autres à 0. Vérifie puis enregistre.`,
       )
-      await upsertBudgets(rows)
-      await reload()
-      setInfo(`Budgets appliqués jusqu’en ${formatMonth(last).toLowerCase()}.`)
     } catch (e) {
       setActionError(errorMessage(e))
     } finally {
@@ -127,11 +116,12 @@ export function BudgetsPage() {
 
   return (
     <>
-      <PageHeader title="Budgets" actions={<MonthPicker month={month} onChange={setMonth} />} />
+      <PageHeader title="Budgets" actions={<YearPicker year={year} onChange={setYear} />} />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        <button className="btn-secondary" onClick={() => void copyPrevious()} disabled={busy}>Copier le mois précédent</button>
-        <button className="btn-secondary" onClick={() => void applyToRestOfYear()} disabled={busy}>Appliquer jusqu’à décembre</button>
+        <button className="btn-secondary" onClick={() => void computeFromSchedule()} disabled={busy || loading}>
+          Calculer le budget en fonction de l’échéancier
+        </button>
         <button className="btn-primary ml-auto" onClick={() => void onSave()} disabled={busy || changes.length === 0}>
           Enregistrer{changes.length > 0 ? ` (${changes.length})` : ''}
         </button>
@@ -148,7 +138,7 @@ export function BudgetsPage() {
         <div className="card overflow-hidden">
           <div className="hidden grid-cols-[1fr_8rem_7rem_7rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-500 uppercase sm:grid">
             <span>Catégorie</span>
-            <span className="text-right">Budget</span>
+            <span className="text-right">Budget {year}</span>
             <span className="text-right">Dépensé</span>
             <span className="text-right">Reste</span>
           </div>
@@ -172,7 +162,7 @@ export function BudgetsPage() {
                         placeholder="—"
                         value={draft[c.id] ?? ''}
                         onChange={(e) => setDraft({ ...draft, [c.id]: e.target.value })}
-                        aria-label={`Budget ${c.name}`}
+                        aria-label={`Budget ${year} ${c.name}`}
                       />
                       <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-400">€</span>
                     </div>
@@ -186,7 +176,7 @@ export function BudgetsPage() {
                       ) : (
                         <span className={`font-semibold tabular-nums ${remaining < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
                           <span className="font-normal text-slate-500 sm:hidden">Reste </span>
-                          {remaining.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                          {formatEuro(remaining)}
                         </span>
                       )}
                     </span>
@@ -194,6 +184,7 @@ export function BudgetsPage() {
                   {budget !== null && (
                     <div className="mt-2">
                       <BudgetBar spent={s} budget={budget} color={c.color} />
+                      <p className="mt-1 text-xs text-slate-400">soit {formatEuro(round2(budget / 12))} par mois</p>
                     </div>
                   )}
                 </li>
@@ -202,17 +193,18 @@ export function BudgetsPage() {
           </ul>
           <div className="grid grid-cols-[1fr_7rem] gap-x-3 border-t border-slate-200 bg-slate-50 px-4 py-3 font-semibold sm:grid-cols-[1fr_8rem_7rem_7rem]">
             <span>Total budgété</span>
-            <span className="pr-7 text-right tabular-nums">{totalBudget.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</span>
+            <span className="pr-7 text-right tabular-nums">{formatEuro(totalBudget)}</span>
             <span className="text-sm sm:text-right"><span className="font-normal text-slate-500 sm:hidden">Dépensé </span><Amount value={totalSpent} signed={false} /></span>
             <span className={`text-right text-sm tabular-nums ${totalBudget - totalSpent < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
               <span className="font-normal text-slate-500 sm:hidden">Reste </span>
-              {round2(totalBudget - totalSpent).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+              {formatEuro(round2(totalBudget - totalSpent))}
             </span>
           </div>
         </div>
       )}
       <p className="mt-3 text-xs text-slate-500">
-        « Dépensé » correspond aux dépenses moins les remboursements ventilés sur la catégorie pendant le mois. Laisser un budget vide le supprime.
+        Le budget est annuel ; l’accueil et les rapports mensuels en utilisent un douzième par mois.
+        « Dépensé » correspond aux dépenses moins les remboursements ventilés sur la catégorie pendant l’année. Laisser un budget vide le supprime.
       </p>
     </>
   )
