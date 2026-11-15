@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
-import { getTransaction, listTransactions, setTransactionChecked } from '../lib/api'
+import { listTransactions, setTransactionChecked } from '../lib/api'
 import { addMonths, currentMonth, formatDay, yearStart } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import { useAsync } from '../lib/useAsync'
@@ -12,6 +12,9 @@ import { IconPlus, IconSearch } from '../components/Icons'
 
 type Period = 'mois' | 'annee'
 
+/** Filtre « Lignes de budget » (elles n'ont pas de compte) */
+const BUDGETS = '__budgets__'
+
 export function TransactionsPage() {
   const { accounts } = useData()
   const [period, setPeriod] = useState<Period>('mois')
@@ -21,44 +24,19 @@ export function TransactionsPage() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [creating, setCreating] = useState(false)
-  // Ligne de budget sur laquelle imputer la nouvelle opération (bouton « + »)
+  // Ligne de budget pré-remplie dans la nouvelle opération (bouton « + »)
   const [budgetParent, setBudgetParent] = useState<Transaction | null>(null)
-  // Budget de l'opération imputée en cours de modification
-  const [editingBudget, setEditingBudget] = useState<Transaction | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const from = period === 'mois' ? month : yearStart(year)
   const to = period === 'mois' ? addMonths(month, 1) : yearStart(year + 1)
 
-  const load = useCallback(() => listTransactions({ from, to, accountId: accountId || undefined }), [from, to, accountId])
+  const budgetsOnly = accountId === BUDGETS
+  const load = useCallback(
+    () => listTransactions({ from, to, accountId: accountId && !budgetsOnly ? accountId : undefined, budgetsOnly }),
+    [from, to, accountId, budgetsOnly],
+  )
   const { data, loading, error, reload, setData } = useAsync(load, [load])
-
-  const budgetLabels = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const t of data ?? []) if (t.is_budget) map[t.id] = t.label
-    return map
-  }, [data])
-
-  // Budget de l'opération modifiée : déjà chargé, sinon lu en base (autre période)
-  useEffect(() => {
-    const id = editing?.budget_id
-    if (!id) {
-      setEditingBudget(null)
-      return
-    }
-    const found = data?.find((t) => t.id === id)
-    if (found) {
-      setEditingBudget(found)
-      return
-    }
-    let alive = true
-    getTransaction(id)
-      .then((b) => alive && setEditingBudget(b))
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [editing, data])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -139,10 +117,11 @@ export function TransactionsPage() {
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)} aria-label="Compte">
-            <option value="">Tous les comptes</option>
+            <option value="">Tous les comptes et budgets</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
+            <option value={BUDGETS}>Lignes de budget</option>
           </select>
           <div className="relative">
             <IconSearch className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -186,7 +165,6 @@ export function TransactionsPage() {
                     onClick={() => setEditing(t)}
                     onToggleChecked={() => void toggleChecked(t)}
                     onAddToBudget={t.is_budget ? () => addToBudget(t) : undefined}
-                    budgetLabel={t.budget_id ? budgetLabels[t.budget_id] : undefined}
                   />
                 ))}
               </ul>
@@ -207,8 +185,8 @@ export function TransactionsPage() {
       <TransactionModal
         open={creating || editing !== null}
         transaction={editing}
-        budget={editing ? editingBudget : budgetParent}
-        defaultAccountId={accountId || undefined}
+        prefillBudget={editing ? null : budgetParent}
+        defaultAccountId={accountId && !budgetsOnly ? accountId : undefined}
         onClose={() => {
           setCreating(false)
           setEditing(null)

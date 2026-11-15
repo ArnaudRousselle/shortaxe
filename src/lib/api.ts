@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type {
   Account,
   AccountBalance,
+  BudgetLine,
   ScheduledTransaction,
   ScheduledTransactionInput,
   Transaction,
@@ -64,14 +65,21 @@ export type TransactionFilter = {
   from?: string // inclus
   to?: string // exclu
   accountId?: string
+  /** Uniquement les lignes de budget */
+  budgetsOnly?: boolean
   limit?: number
 }
+
+// Opération + répartition sur les budgets (avec le libellé de chaque budget)
+const TX_SELECT =
+  '*, transaction_budget_allocations!transaction_budget_allocations_transaction_id_fkey(budget_id, amount, budget:transactions!transaction_budget_allocations_budget_id_fkey(label))'
 
 function normalizeTx(t: Transaction): Transaction {
   return {
     ...t,
     amount: num(t.amount),
     budget_overrun: num(t.budget_overrun),
+    transaction_budget_allocations: (t.transaction_budget_allocations ?? []).map((a) => ({ ...a, amount: num(a.amount) })),
   }
 }
 
@@ -82,13 +90,14 @@ export async function listTransactions(f: TransactionFilter = {}): Promise<Trans
   for (let offset = 0; offset < limit; offset += PAGE) {
     let q = supabase
       .from('transactions')
-      .select('*')
+      .select(TX_SELECT)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .order('id')
     if (f.from) q = q.gte('date', f.from)
     if (f.to) q = q.lt('date', f.to)
     if (f.accountId) q = q.eq('account_id', f.accountId)
+    if (f.budgetsOnly) q = q.eq('is_budget', true)
     const size = Math.min(PAGE, limit - offset)
     const rows = check(await q.range(offset, offset + size - 1)) as Transaction[]
     out.push(...rows.map(normalizeTx))
@@ -107,17 +116,22 @@ export async function saveTransaction(t: TransactionInput): Promise<string> {
     p_notes: t.notes,
     p_is_checked: t.is_checked,
     p_is_budget: t.is_budget,
-    p_budget_id: t.budget_id,
+    p_allocations: t.allocations,
   })
   return check(res) as string
 }
 
-/** Une opération (pour retrouver la ligne de budget d'une opération imputée) */
-export async function getTransaction(id: string): Promise<Transaction | null> {
-  const row = check(
-    await supabase.from('transactions').select('*').eq('id', id).maybeSingle(),
-  ) as Transaction | null
-  return row ? normalizeTx(row) : null
+/** Toutes les lignes de budget, de la plus récente à la plus ancienne */
+export async function listBudgets(): Promise<BudgetLine[]> {
+  const rows = check(
+    await supabase
+      .from('transactions')
+      .select('id, label, date, amount, budget_overrun')
+      .eq('is_budget', true)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false }),
+  ) as BudgetLine[]
+  return rows.map((b) => ({ ...b, amount: num(b.amount), budget_overrun: num(b.budget_overrun) }))
 }
 
 export async function setTransactionChecked(id: string, checked: boolean): Promise<void> {

@@ -141,7 +141,7 @@ export function SchedulePage() {
             {items.map((i) => {
               const isDue = isScheduleDue(i.next_date, today)
               const late = i.next_date < today.slice(0, 8) + '01'
-              const account = accountById[i.account_id]
+              const account = i.account_id ? accountById[i.account_id] : undefined
               return (
                 <li
                   key={i.id}
@@ -167,7 +167,7 @@ export function SchedulePage() {
                           <IconRepeat className="h-3.5 w-3.5" />
                           {formatFrequency(i.frequency_months)}
                         </span>
-                        <span className="truncate">{account?.name ?? '?'}</span>
+                        {i.account_id && <span className="truncate">{account?.name ?? '?'}</span>}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
