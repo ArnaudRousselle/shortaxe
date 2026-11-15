@@ -94,6 +94,7 @@ function normalizeTx(t: Transaction): Transaction {
   return {
     ...t,
     amount: num(t.amount),
+    budget_overrun: num(t.budget_overrun),
     transaction_splits: (t.transaction_splits ?? []).map((s) => ({ ...s, amount: num(s.amount) })),
   }
 }
@@ -130,8 +131,18 @@ export async function saveTransaction(t: TransactionInput): Promise<string> {
     p_notes: t.notes,
     p_is_checked: t.is_checked,
     p_splits: t.splits,
+    p_is_budget: t.is_budget,
+    p_budget_id: t.budget_id,
   })
   return check(res) as string
+}
+
+/** Une opération (pour retrouver la ligne de budget d'une opération imputée) */
+export async function getTransaction(id: string): Promise<Transaction | null> {
+  const row = check(
+    await supabase.from('transactions').select('*, transaction_splits(*)').eq('id', id).maybeSingle(),
+  ) as Transaction | null
+  return row ? normalizeTx(row) : null
 }
 
 export async function setTransactionChecked(id: string, checked: boolean): Promise<void> {
@@ -177,6 +188,7 @@ export async function saveScheduled(t: ScheduledTransactionInput): Promise<strin
     p_frequency_months: t.frequency_months,
     p_next_date: t.next_date,
     p_splits: t.splits,
+    p_is_budget: t.is_budget,
   })
   return check(res) as string
 }

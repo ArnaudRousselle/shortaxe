@@ -24,11 +24,31 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="card p-8 text-center text-sm text-slate-500">{children}</div>
 }
 
-export function Amount({ value, signed = true, className = '' }: { value: number; signed?: boolean; className?: string }) {
-  const color = value > 0 ? 'text-emerald-700' : value < 0 ? 'text-slate-900' : 'text-slate-500'
+export function Amount({
+  value,
+  signed = true,
+  muted = false,
+  className = '',
+}: {
+  value: number
+  signed?: boolean
+  /** Gris clair (lignes de budget) */
+  muted?: boolean
+  className?: string
+}) {
+  const color = muted ? 'text-slate-400' : value > 0 ? 'text-emerald-700' : value < 0 ? 'text-slate-900' : 'text-slate-500'
   return (
     <span className={`tabular-nums whitespace-nowrap ${color} ${className}`}>
       {signed ? formatSignedEuro(value) : formatEuro(value)}
+    </span>
+  )
+}
+
+/** Petite étiquette « Budget » à côté d'un libellé */
+export function BudgetBadge() {
+  return (
+    <span className="ml-2 inline-block rounded border border-slate-300 px-1.5 py-px align-middle text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+      Budget
     </span>
   )
 }

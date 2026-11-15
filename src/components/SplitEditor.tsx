@@ -20,6 +20,7 @@ export function SplitEditor({
   totalCents,
   result,
   categories,
+  mode = 'free',
 }: {
   rows: SplitRow[]
   setRows: Dispatch<SetStateAction<SplitRow[]>>
@@ -27,6 +28,11 @@ export function SplitEditor({
   result: ReturnType<typeof computeSplits>
   /** Catégories proposées */
   categories: Category[]
+  /**
+   * free : ventilation libre ; single : une seule catégorie (budget) ;
+   * locked : catégorie imposée, non modifiable (opération imputée sur un budget)
+   */
+  mode?: 'free' | 'single' | 'locked'
 }) {
   const { categoryById } = useData()
 
@@ -53,11 +59,14 @@ export function SplitEditor({
   }
 
   const multi = rows.length > 1
+  const free = mode === 'free'
 
   return (
     <div className="rounded-lg border border-slate-200 p-3">
       <div className="mb-3">
-        <span className="text-sm font-medium text-slate-700">Catégories</span>
+        <span className="text-sm font-medium text-slate-700">{free ? 'Catégories' : 'Catégorie'}</span>
+        {mode === 'single' && <p className="text-xs text-slate-500">Un budget porte sur une seule catégorie.</p>}
+        {mode === 'locked' && <p className="text-xs text-slate-500">Catégorie du budget.</p>}
       </div>
 
       {rows.length === 0 && (
@@ -75,6 +84,7 @@ export function SplitEditor({
                 value={r.categoryId}
                 onChange={(e) => updateRow(r.key, { categoryId: e.target.value })}
                 aria-label="Catégorie"
+                disabled={mode === 'locked'}
               >
                 <option value="">Choisir…</option>
                 {categories.map((c) => (
@@ -94,29 +104,33 @@ export function SplitEditor({
                   <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500">€</span>
                 </div>
               )}
-              <button
-                type="button"
-                className="btn-ghost shrink-0"
-                onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
-                aria-label="Retirer la ligne"
-              >
-                <IconTrash className="h-4 w-4" />
-              </button>
+              {free && (
+                <button
+                  type="button"
+                  className="btn-ghost shrink-0"
+                  onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                  aria-label="Retirer la ligne"
+                >
+                  <IconTrash className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )
         })}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <button type="button" className="btn-ghost text-brand-700" onClick={addRow}>
-          <IconPlus className="h-4 w-4" /> {rows.length === 0 ? 'Ajouter une catégorie' : 'Répartir sur une autre catégorie'}
-        </button>
-        {multi && totalCents !== null && totalCents > 0 && result.remaining !== 0 && (
-          <span className="text-sm text-amber-700">
-            {result.remaining > 0 ? 'Reste à répartir' : 'Dépassement'} : {formatEuro(Math.abs(result.remaining) / 100)}
-          </span>
-        )}
-      </div>
+      {free && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <button type="button" className="btn-ghost text-brand-700" onClick={addRow}>
+            <IconPlus className="h-4 w-4" /> {rows.length === 0 ? 'Ajouter une catégorie' : 'Répartir sur une autre catégorie'}
+          </button>
+          {multi && totalCents !== null && totalCents > 0 && result.remaining !== 0 && (
+            <span className="text-sm text-amber-700">
+              {result.remaining > 0 ? 'Reste à répartir' : 'Dépassement'} : {formatEuro(Math.abs(result.remaining) / 100)}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

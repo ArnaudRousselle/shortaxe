@@ -41,3 +41,12 @@ export function computeSplits(totalCents: number, rows: SplitRow[]): SplitResult
 
   return { splits: rows.map((r, i) => ({ categoryId: r.categoryId, cents: cents[i] })), error: null, remaining: 0 }
 }
+
+/**
+ * Ventilation d'un budget : une seule catégorie.
+ * Garde la première ligne (montant effacé, il reçoit tout) ou en crée une vide.
+ */
+export function toSingleCategory(rows: SplitRow[], newKey: () => number): SplitRow[] {
+  const first = rows[0]
+  return [first ? { ...first, value: '' } : { key: newKey(), categoryId: '', value: '' }]
+}

@@ -33,6 +33,12 @@ export type Transaction = {
   amount: number
   notes: string | null
   is_checked: boolean
+  /** Ligne de budget (enveloppe) : les opérations imputées en sont retirées */
+  is_budget: boolean
+  /** Ligne de budget sur laquelle l'opération est imputée */
+  budget_id: string | null
+  /** Dépassement d'une ligne de budget (même signe que le budget, 0 sinon) : le budget reste alors à 0 */
+  budget_overrun: number
   created_at: string
   updated_at: string
   transaction_splits: Split[]
@@ -46,6 +52,8 @@ export type TransactionInput = {
   amount: number
   notes: string | null
   is_checked: boolean
+  is_budget: boolean
+  budget_id: string | null
   splits: { category_id: string; amount: number }[]
 }
 
@@ -74,6 +82,8 @@ export type ScheduledTransaction = {
   /** Date de la prochaine opération à créer (YYYY-MM-DD) */
   next_date: string
   day_of_month: number
+  /** Échéance « budget » : les opérations créées sont des lignes de budget */
+  is_budget: boolean
   created_at: string
   updated_at: string
   scheduled_transaction_splits: Split[]
@@ -87,5 +97,6 @@ export type ScheduledTransactionInput = {
   notes: string | null
   frequency_months: number
   next_date: string
+  is_budget: boolean
   splits: { category_id: string; amount: number }[]
 }
