@@ -8,7 +8,7 @@ Application web de gestion des comptes de la famille (plusieurs comptes bancaire
 - Tailwind CSS v4 (plugin `@tailwindcss/vite`, pas de `tailwind.config`)
 - Supabase (PostgreSQL + Auth) via `@supabase/supabase-js`
 - Tests : Vitest, uniquement sur la logique pure de `src/lib` (`*.test.ts`, environnement `node`)
-- Hébergement : Vercel (chaque push sur `main` redéploie la production)
+- Hébergement : Vercel (chaque push sur `main` redéploie la production ; chaque push sur `develop` redéploie le site de test, branché sur la base de dev)
 - Node.js ≥ 20.19
 
 ## Commandes
@@ -20,6 +20,8 @@ npm run typecheck   # tsc --noEmit
 npm test            # vitest run
 npm run build       # typecheck + build Vite
 ```
+
+En local, `.env.local` pointe sur la base de **dev** `shortaxe-dev` (`VITE_SUPABASE_URL=https://rpiouzqephpuomimlfld.supabase.co` + sa clé publishable), jamais sur la production.
 
 Avant de proposer un commit : `npm run typecheck` et `npm test` doivent passer (ce sont les deux étapes de la CI GitHub Actions, `.github/workflows/ci.yml`).
 
@@ -73,11 +75,25 @@ supabase/
 - Toute évolution du schéma :
   1. nouvelle migration idempotente dans `supabase/migrations/AAAAMMJJ_nom.sql` (`create … if not exists`, `create or replace`) ;
   2. même changement reporté dans `supabase/schema.sql` ;
-  3. migration appliquée sur la base de production (SQL Editor Supabase) **avant** de merger la PR, puisque le merge redéploie le site immédiatement.
-- Projet Supabase de production : `shortaxe` (réf. `slgovycftiqvyzdfbkls`). Ne pas modifier la base de production sans accord explicite.
-- Projet Supabase de développement : `shortaxe-dev` (réf. `rpiouzqephpuomimlfld`), utilisé par les déploiements Preview de la branche `develop`. Appliquer les migrations ici en premier.
+  3. migration appliquée sur la base de **dev** (`shortaxe-dev`) avant de merger dans `develop` ;
+  4. migration appliquée sur la base de **production** (SQL Editor Supabase) **avant** de merger `develop` dans `main`, puisque le merge redéploie le site immédiatement.
+
+### Environnements
+
+| | Production | Développement |
+|---|---|---|
+| Branche Git | `main` | `develop` |
+| Site | https://shortaxe.vercel.app | https://shortaxe-git-develop-ar-team19.vercel.app (Preview Vercel) |
+| Projet Supabase | `shortaxe` (réf. `slgovycftiqvyzdfbkls`) | `shortaxe-dev` (réf. `rpiouzqephpuomimlfld`) |
+
+- Ne pas modifier la base de production sans accord explicite. La base de dev contient des données de test et peut être modifiée librement.
+- Dans Vercel, `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont redéfinies en Preview pour la seule branche `develop` (valeurs de `shortaxe-dev`) ; les autres déploiements utilisent la production.
+- Plan gratuit Supabase : un projet inactif une semaine est mis en pause ; le relancer depuis le tableau de bord.
 
 ## Git
 
-- `main` = production. Travailler sur une branche et ouvrir une PR ; ne pas pousser directement sur `main`.
+- `main` = production, `develop` = intégration et tests (base de dev).
+- Créer les branches de travail à partir de `develop` et ouvrir les PR vers `develop`.
+- Mise en production : PR `develop` → `main`, après avoir appliqué les migrations en attente sur la base de production.
+- Ne jamais pousser directement sur `main`.
 - Messages de commit courts, en français, à l'impératif présent (ex. « Ajoute l'export CSV »).
