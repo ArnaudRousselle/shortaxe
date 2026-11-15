@@ -1,6 +1,6 @@
 # CLAUDE.md — Shortaxe
 
-Application web de gestion des comptes de la famille (plusieurs comptes bancaires, opérations ventilées par catégorie, budgets annuels, échéancier, rapports, évolution du solde, export JSON). Le README détaille les fonctionnalités et la mise en route.
+Application web de gestion des comptes de la famille (plusieurs comptes bancaires, opérations ventilées par catégorie, budgets annuels, échéancier, rapports, évolution du solde). Le README détaille les fonctionnalités et la mise en route.
 
 ## Stack
 

@@ -53,9 +53,6 @@ export const IconChevronLeft = (p: P) => (
 export const IconChevronRight = (p: P) => (
   <Base {...p}><path d="m9 18 6-6-6-6" /></Base>
 )
-export const IconDownload = (p: P) => (
-  <Base {...p}><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></Base>
-)
 export const IconLogout = (p: P) => (
   <Base {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></Base>
 )
