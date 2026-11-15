@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type { AllocationResult, AllocationRow } from '../lib/allocations'
-import { centsToInput, formatDateShort, formatEuro } from '../lib/format'
+import { centsToInput, formatBudgetOption, formatEuro } from '../lib/format'
 import type { BudgetLine } from '../lib/types'
 import { IconPlus, IconTrash } from './Icons'
 
@@ -9,12 +9,6 @@ let nextKey = 1
 /** Nouvelle clé unique pour une ligne de répartition */
 export function newAllocationKey(): number {
   return nextKey++
-}
-
-/** Libellé d'une ligne de budget dans la liste : « Courses — 01/11/2026 — reste 230,00 € » */
-function budgetOption(b: BudgetLine): string {
-  const rest = b.budget_overrun !== 0 ? `dépassé de ${formatEuro(Math.abs(b.budget_overrun))}` : `reste ${formatEuro(Math.abs(b.amount))}`
-  return `${b.label} — ${formatDateShort(b.date)} — ${rest}`
 }
 
 /** Répartition d'une opération sur une ou plusieurs lignes de budget. */
@@ -74,7 +68,7 @@ export function AllocationEditor({
             >
               <option value="">Choisir un budget…</option>
               {budgets.map((b) => (
-                <option key={b.id} value={b.id}>{budgetOption(b)}</option>
+                <option key={b.id} value={b.id}>{formatBudgetOption(b)}</option>
               ))}
             </select>
             <div className="relative w-28 shrink-0">

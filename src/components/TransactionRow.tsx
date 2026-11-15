@@ -1,14 +1,15 @@
 import { useData } from '../data/DataProvider'
-import { formatEuro } from '../lib/format'
+import { formatEuro, formatRef } from '../lib/format'
 import type { Transaction } from '../lib/types'
 import { Amount, BudgetBadge } from './ui'
-import { IconCheck, IconPlus } from './Icons'
+import { IconCheck, IconEye, IconPlus } from './Icons'
 
 export function TransactionRow({
   transaction: t,
   onClick,
   onToggleChecked,
   onAddToBudget,
+  onShowBudgetChildren,
   showDate,
 }: {
   transaction: Transaction
@@ -16,6 +17,8 @@ export function TransactionRow({
   onToggleChecked?: () => void
   /** Ligne de budget : bouton « + » pour saisir une opération rattachée à ce budget */
   onAddToBudget?: () => void
+  /** Ligne de budget : bouton « œil » pour voir les opérations rattachées */
+  onShowBudgetChildren?: () => void
   showDate?: boolean
 }) {
   const isBudget = t.is_budget
@@ -43,6 +46,7 @@ export function TransactionRow({
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
         <div className="min-w-0">
           <p className="truncate font-medium">
+            {isBudget && <span className="mr-1.5 text-slate-500 tabular-nums">{formatRef(t.ref)}</span>}
             {t.label}
             {isBudget && <BudgetBadge />}
           </p>
@@ -51,7 +55,7 @@ export function TransactionRow({
             {t.account_id && <span className="truncate">{account?.name ?? '?'}</span>}
             {allocs.map((a) => (
               <span key={a.budget_id} className="inline-flex max-w-full items-center gap-1 text-slate-400" title="Rattachée à une ligne de budget">
-                <span className="truncate">↳ {a.budget?.label ?? 'Budget'}</span>
+                <span className="truncate">↳ {a.budget ? `${formatRef(a.budget.ref)} ${a.budget.label}` : 'Budget'}</span>
                 {showAllocAmounts && <span className="shrink-0 tabular-nums">{formatEuro(Math.abs(a.amount))}</span>}
               </span>
             ))}
@@ -64,6 +68,16 @@ export function TransactionRow({
           )}
         </div>
       </button>
+      {onShowBudgetChildren && (
+        <button
+          onClick={onShowBudgetChildren}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700"
+          aria-label={`Voir les opérations du budget ${t.label}`}
+          title="Voir les opérations rattachées à ce budget"
+        >
+          <IconEye className="h-4 w-4" />
+        </button>
+      )}
       {onAddToBudget && (
         <button
           onClick={onAddToBudget}

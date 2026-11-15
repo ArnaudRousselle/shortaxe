@@ -107,6 +107,19 @@ export function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(parseISO(iso))
 }
 
+// ---------- Lignes de budget ----------
+
+/** 12 → "#12" : numéro court d'une opération */
+export function formatRef(ref: number): string {
+  return `#${ref}`
+}
+
+/** Ligne de budget dans une liste de choix : « #12 - Courses - reste 230,00 € » (ou « dépassé de … ») */
+export function formatBudgetOption(b: { ref: number; label: string; amount: number; budget_overrun: number }): string {
+  const rest = b.budget_overrun !== 0 ? `dépassé de ${formatEuro(Math.abs(b.budget_overrun))}` : `reste ${formatEuro(Math.abs(b.amount))}`
+  return `${formatRef(b.ref)} - ${b.label} - ${rest}`
+}
+
 // ---------- Échéancier ----------
 
 /** 1 → "Tous les mois", 12 → "Tous les ans", 3 → "Tous les 3 mois" */

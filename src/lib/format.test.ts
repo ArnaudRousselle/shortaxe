@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   addMonths,
+  formatBudgetOption,
+  formatRef,
   centsToInput,
   currentMonth,
   formatDateShort,
@@ -169,5 +171,21 @@ describe('round2', () => {
     expect(round2(12.344)).toBe(12.34)
     expect(round2(12.346)).toBe(12.35)
     expect(round2(-3.333)).toBe(-3.33)
+  })
+})
+
+describe('lignes de budget', () => {
+  it('formate le numéro court', () => {
+    expect(formatRef(12)).toBe('#12')
+  })
+
+  it('affiche « numéro - libellé - reste »', () => {
+    const label = formatBudgetOption({ ref: 12, label: 'Courses', amount: -230, budget_overrun: 0 })
+    expect(label.replace(/\s/g, ' ')).toBe('#12 - Courses - reste 230,00 €')
+  })
+
+  it('affiche le dépassement à la place du reste', () => {
+    const label = formatBudgetOption({ ref: 3, label: 'Essence', amount: 0, budget_overrun: -15.5 })
+    expect(label.replace(/\s/g, ' ')).toBe('#3 - Essence - dépassé de 15,50 €')
   })
 })

@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type {
   Account,
   AccountBalance,
+  BudgetChild,
   BudgetLine,
   ScheduledTransaction,
   ScheduledTransactionInput,
@@ -72,7 +73,7 @@ export type TransactionFilter = {
 
 // Opération + répartition sur les budgets (avec le libellé de chaque budget)
 const TX_SELECT =
-  '*, transaction_budget_allocations!transaction_budget_allocations_transaction_id_fkey(budget_id, amount, budget:transactions!transaction_budget_allocations_budget_id_fkey(label))'
+  '*, transaction_budget_allocations!transaction_budget_allocations_transaction_id_fkey(budget_id, amount, budget:transactions!transaction_budget_allocations_budget_id_fkey(ref, label))'
 
 function normalizeTx(t: Transaction): Transaction {
   return {
@@ -121,12 +122,25 @@ export async function saveTransaction(t: TransactionInput): Promise<string> {
   return check(res) as string
 }
 
+/** Opérations rattachées à une ligne de budget, de la plus récente à la plus ancienne */
+export async function listBudgetChildren(budgetId: string): Promise<BudgetChild[]> {
+  const rows = check(
+    await supabase
+      .from('transaction_budget_allocations')
+      .select('amount, transaction:transactions!transaction_budget_allocations_transaction_id_fkey(id, ref, account_id, date, label, amount, is_checked)')
+      .eq('budget_id', budgetId),
+  ) as unknown as BudgetChild[]
+  return rows
+    .map((r) => ({ amount: num(r.amount), transaction: { ...r.transaction, amount: num(r.transaction.amount) } }))
+    .sort((a, b) => b.transaction.date.localeCompare(a.transaction.date) || b.transaction.ref - a.transaction.ref)
+}
+
 /** Toutes les lignes de budget, de la plus récente à la plus ancienne */
 export async function listBudgets(): Promise<BudgetLine[]> {
   const rows = check(
     await supabase
       .from('transactions')
-      .select('id, label, date, amount, budget_overrun')
+      .select('id, ref, label, date, amount, budget_overrun')
       .eq('is_budget', true)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false }),
