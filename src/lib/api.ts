@@ -2,8 +2,6 @@ import { supabase } from './supabase'
 import type {
   Account,
   AccountBalance,
-  Category,
-  CategoryMonthlyTotal,
   ScheduledTransaction,
   ScheduledTransactionInput,
   Transaction,
@@ -60,27 +58,6 @@ export async function listBalances(): Promise<Record<string, AccountBalance>> {
   return map
 }
 
-// ---------------------------------------------------------------- Catégories
-
-export async function listCategories(): Promise<Category[]> {
-  return check(await supabase.from('categories').select('*').order('name')) as Category[]
-}
-
-export async function saveCategory(
-  c: Pick<Category, 'name' | 'color' | 'is_archived'> & { id?: string },
-): Promise<void> {
-  if (c.id) {
-    const { id, ...rest } = c
-    check(await supabase.from('categories').update(rest).eq('id', id))
-  } else {
-    check(await supabase.from('categories').insert(c))
-  }
-}
-
-export async function deleteCategory(id: string): Promise<void> {
-  check(await supabase.from('categories').delete().eq('id', id))
-}
-
 // ---------------------------------------------------------------- Opérations
 
 export type TransactionFilter = {
@@ -95,7 +72,6 @@ function normalizeTx(t: Transaction): Transaction {
     ...t,
     amount: num(t.amount),
     budget_overrun: num(t.budget_overrun),
-    transaction_splits: (t.transaction_splits ?? []).map((s) => ({ ...s, amount: num(s.amount) })),
   }
 }
 
@@ -106,7 +82,7 @@ export async function listTransactions(f: TransactionFilter = {}): Promise<Trans
   for (let offset = 0; offset < limit; offset += PAGE) {
     let q = supabase
       .from('transactions')
-      .select('*, transaction_splits(*)')
+      .select('*')
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .order('id')
@@ -130,7 +106,6 @@ export async function saveTransaction(t: TransactionInput): Promise<string> {
     p_amount: t.amount,
     p_notes: t.notes,
     p_is_checked: t.is_checked,
-    p_splits: t.splits,
     p_is_budget: t.is_budget,
     p_budget_id: t.budget_id,
   })
@@ -140,7 +115,7 @@ export async function saveTransaction(t: TransactionInput): Promise<string> {
 /** Une opération (pour retrouver la ligne de budget d'une opération imputée) */
 export async function getTransaction(id: string): Promise<Transaction | null> {
   const row = check(
-    await supabase.from('transactions').select('*, transaction_splits(*)').eq('id', id).maybeSingle(),
+    await supabase.from('transactions').select('*').eq('id', id).maybeSingle(),
   ) as Transaction | null
   return row ? normalizeTx(row) : null
 }
@@ -167,15 +142,11 @@ export async function listScheduled(): Promise<ScheduledTransaction[]> {
   const rows = check(
     await supabase
       .from('scheduled_transactions')
-      .select('*, scheduled_transaction_splits(*)')
+      .select('*')
       .order('next_date')
       .order('label'),
   ) as ScheduledTransaction[]
-  return rows.map((t) => ({
-    ...t,
-    amount: num(t.amount),
-    scheduled_transaction_splits: (t.scheduled_transaction_splits ?? []).map((s) => ({ ...s, amount: num(s.amount) })),
-  }))
+  return rows.map((t) => ({ ...t, amount: num(t.amount) }))
 }
 
 export async function saveScheduled(t: ScheduledTransactionInput): Promise<string> {
@@ -187,7 +158,6 @@ export async function saveScheduled(t: ScheduledTransactionInput): Promise<strin
     p_notes: t.notes,
     p_frequency_months: t.frequency_months,
     p_next_date: t.next_date,
-    p_splits: t.splits,
     p_is_budget: t.is_budget,
   })
   return check(res) as string
@@ -211,11 +181,4 @@ export async function countDueScheduled(before: string): Promise<number> {
     .lt('next_date', before)
   if (res.error) throw res.error
   return res.count ?? 0
-}
-
-export async function getCategoryTotals(from: string, to: string): Promise<CategoryMonthlyTotal[]> {
-  const rows = check(
-    await supabase.from('category_monthly_totals').select('*').gte('month', from).lt('month', to),
-  ) as CategoryMonthlyTotal[]
-  return rows.map((r) => ({ ...r, total: num(r.total) }))
 }

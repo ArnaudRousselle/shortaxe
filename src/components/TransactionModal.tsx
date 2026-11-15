@@ -1,15 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteTransaction, recentLabels, saveTransaction } from '../lib/api'
 import { centsToInput, formatEuro, parseEuroToCents, todayISO, toCents } from '../lib/format'
-import { computeSplits, toSingleCategory, type SplitRow } from '../lib/splits'
 import { errorMessage } from '../lib/supabase'
 import type { Transaction } from '../lib/types'
 import { ErrorBanner, Modal, Segmented } from './ui'
-import { newSplitKey, SplitEditor } from './SplitEditor'
 
 type Kind = 'depense' | 'recette'
-type Row = SplitRow
 
 export function TransactionModal({
   open,
@@ -30,12 +27,8 @@ export function TransactionModal({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { accounts, categories } = useData()
+  const { accounts } = useData()
   const activeAccounts = accounts.filter((a) => !a.is_archived || a.id === transaction?.account_id)
-  const usedCategoryIds = new Set(
-    [...(transaction?.transaction_splits ?? []), ...(budget?.transaction_splits ?? [])].map((s) => s.category_id),
-  )
-  const selectableCategories = categories.filter((c) => !c.is_archived || usedCategoryIds.has(c.id))
 
   const [kind, setKind] = useState<Kind>('depense')
   const [accountId, setAccountId] = useState('')
@@ -45,7 +38,6 @@ export function TransactionModal({
   const [notes, setNotes] = useState('')
   const [isChecked, setIsChecked] = useState(false)
   const [isBudget, setIsBudget] = useState(false)
-  const [rows, setRows] = useState<Row[]>([])
   const [labels, setLabels] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,13 +56,6 @@ export function TransactionModal({
       setNotes(transaction.notes ?? '')
       setIsChecked(transaction.is_checked)
       setIsBudget(transaction.is_budget)
-      setRows(
-        transaction.transaction_splits.map((s) => ({
-          key: newSplitKey(),
-          categoryId: s.category_id,
-          value: centsToInput(Math.abs(toCents(s.amount))),
-        })),
-      )
     } else {
       setKind(budget && budget.amount > 0 ? 'recette' : 'depense')
       setAccountId(budget?.account_id || defaultAccountId || activeAccounts[0]?.id || '')
@@ -80,8 +65,6 @@ export function TransactionModal({
       setNotes('')
       setIsChecked(false)
       setIsBudget(false)
-      // Opération imputée sur un budget : catégorie du budget proposée par défaut
-      setRows([{ key: newSplitKey(), categoryId: budget?.transaction_splits[0]?.category_id ?? '', value: '' }])
     }
     recentLabels().then(setLabels).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,12 +75,6 @@ export function TransactionModal({
   const linkedBudget = budget && budget.id === budgetId ? budget : null
 
   const totalCents = parseEuroToCents(amount)
-  const result = useMemo(() => computeSplits(totalCents ?? 0, rows), [totalCents, rows])
-
-  function onBudgetChange(checked: boolean) {
-    setIsBudget(checked)
-    if (checked) setRows((rs) => toSingleCategory(rs, newSplitKey))
-  }
 
   async function onSubmit() {
     setError(null)
@@ -105,8 +82,6 @@ export function TransactionModal({
     if (!label.trim()) return setError('Le libellé est obligatoire.')
     if (!date) return setError('La date est obligatoire.')
     if (totalCents === null || totalCents <= 0) return setError('Le montant doit être un nombre positif.')
-    if (isBudget && !budgetId && rows.length !== 1) return setError('Un budget porte sur une seule catégorie.')
-    if (result.error) return setError(result.error)
     if (
       transaction?.is_budget &&
       !isBudget &&
@@ -126,7 +101,6 @@ export function TransactionModal({
         is_checked: isChecked,
         is_budget: budgetId ? false : isBudget,
         budget_id: budgetId,
-        splits: result.splits.map((s) => ({ category_id: s.categoryId, amount: (sign * s.cents) / 100 })),
       })
       onSaved()
     } catch (e) {
@@ -154,7 +128,6 @@ export function TransactionModal({
       setBusy(false)
     }
   }
-
 
   return (
     <Modal
@@ -239,15 +212,6 @@ export function TransactionModal({
           </select>
         </div>
 
-        <SplitEditor
-          rows={rows}
-          setRows={setRows}
-          totalCents={totalCents}
-          result={result}
-          categories={selectableCategories}
-          mode={budgetId ? 'locked' : isBudget ? 'single' : 'free'}
-        />
-
         <div>
           <label className="label" htmlFor="tx-notes">Note (facultatif)</label>
           <textarea id="tx-notes" rows={2} className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -260,11 +224,11 @@ export function TransactionModal({
 
         {!budgetId && (
           <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => onBudgetChange(e.target.checked)} />
+            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
             <span>
               Budget
               <span className="block text-xs text-slate-500">
-                Une seule catégorie. Enveloppe : les opérations ajoutées avec le bouton « + » de la ligne en seront déduites.
+                Enveloppe : les opérations ajoutées avec le bouton « + » de la ligne en seront déduites.
               </span>
             </span>
           </label>

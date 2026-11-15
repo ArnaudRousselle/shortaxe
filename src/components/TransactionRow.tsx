@@ -1,7 +1,7 @@
 import { useData } from '../data/DataProvider'
 import { formatEuro } from '../lib/format'
 import type { Transaction } from '../lib/types'
-import { Amount, BudgetBadge, CategoryDot } from './ui'
+import { Amount, BudgetBadge } from './ui'
 import { IconCheck, IconPlus } from './Icons'
 
 export function TransactionRow({
@@ -22,7 +22,7 @@ export function TransactionRow({
   showDate?: boolean
 }) {
   const muted = t.is_budget
-  const { accountById, categoryById } = useData()
+  const { accountById } = useData()
   const account = accountById[t.account_id]
 
   return (
@@ -53,18 +53,6 @@ export function TransactionRow({
                 ↳ {budgetLabel ? `Budget ${budgetLabel}` : 'Budget'}
               </span>
             )}
-            {t.transaction_splits.length === 0 && <span className="text-amber-700">Sans catégorie</span>}
-            {t.transaction_splits.map((s) => {
-              const c = categoryById[s.category_id]
-              const multi = t.transaction_splits.length > 1
-              return (
-                <span key={s.id ?? s.category_id} className="inline-flex items-center gap-1">
-                  <CategoryDot color={c?.color ?? '#94a3b8'} className="h-2 w-2" />
-                  {c?.name ?? '?'}
-                  {multi && <span className="text-slate-400 tabular-nums">{formatEuro(Math.abs(s.amount))}</span>}
-                </span>
-              )
-            })}
           </div>
         </div>
         <div className="shrink-0 text-right">

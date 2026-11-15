@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { PageHeader } from '../components/ui'
-import { IconCalendar, IconChevronRight, IconLogout, IconTag, IconTrend, IconWallet } from '../components/Icons'
+import { IconCalendar, IconChevronRight, IconLogout, IconTrend, IconWallet } from '../components/Icons'
 
 export function SettingsPage() {
   const { session, signOut } = useAuth()
@@ -22,7 +22,6 @@ export function SettingsPage() {
           {link('/echeancier', 'Échéancier', IconCalendar)}
           {link('/evolution', 'Évolution du solde', IconTrend)}
           {link('/comptes', 'Comptes bancaires', IconWallet)}
-          {link('/categories', 'Catégories', IconTag)}
         </section>
 
         <section className="card p-4">

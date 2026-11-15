@@ -19,6 +19,7 @@ import {
   toCents,
   todayISO,
   yearStart,
+  round2,
 } from './format'
 
 // Intl en fr-FR utilise des espaces insécables : on les normalise
@@ -159,5 +160,14 @@ describe('isScheduleDue', () => {
   it('gère le passage d’année', () => {
     expect(isScheduleDue('2026-12-31', '2026-12-01')).toBe(true)
     expect(isScheduleDue('2027-01-01', '2026-12-31')).toBe(false)
+  })
+})
+
+describe('round2', () => {
+  it('arrondit au centime', () => {
+    expect(round2(0.1 + 0.2)).toBe(0.3)
+    expect(round2(12.344)).toBe(12.34)
+    expect(round2(12.346)).toBe(12.35)
+    expect(round2(-3.333)).toBe(-3.33)
   })
 })

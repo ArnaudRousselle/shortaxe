@@ -1,6 +1,6 @@
 # CLAUDE.md — Shortaxe
 
-Application web de gestion des comptes de la famille (plusieurs comptes bancaires, opérations ventilées par catégorie, échéancier, rapports, évolution du solde). Le README détaille les fonctionnalités et la mise en route.
+Application web de gestion des comptes de la famille (plusieurs comptes bancaires, opérations, échéancier, lignes de budget, évolution du solde). Le README détaille les fonctionnalités et la mise en route.
 
 ## Stack
 
@@ -31,7 +31,7 @@ Avant de proposer un commit : `npm run typecheck` et `npm test` doivent passer (
 src/
   auth/        connexion, mot de passe, contrôle d'accès (AuthProvider)
   components/  mise en page, modales, graphique du solde, composants communs (ui.tsx)
-  data/        DataProvider : comptes et catégories partagés entre les écrans
+  data/        DataProvider : comptes partagés entre les écrans
   lib/         client Supabase, accès aux données (api.ts), types, formats, calculs
   pages/       un fichier par écran (XxxPage.tsx)
 supabase/
@@ -47,7 +47,7 @@ supabase/
 - Noms de code (variables, fonctions, tables, colonnes) en anglais.
 
 **Montants**
-- En base : `numeric(12,2)`. Négatif = dépense, positif = recette. Une ventilation (`transaction_splits`) a le même signe que l'opération.
+- En base : `numeric(12,2)`. Négatif = dépense, positif = recette.
 - Les calculs se font en centimes entiers (`toCents` / `fromCents` / `parseEuroToCents` dans `src/lib/format.ts`) pour éviter les erreurs d'arrondi.
 - Affichage via `formatEuro` / `formatSignedEuro` ou le composant `<Amount>` (`fr-FR`, EUR). Ne pas formater les montants à la main.
 
@@ -55,11 +55,11 @@ supabase/
 - Tous les appels Supabase passent par `src/lib/api.ts` : les pages et composants n'appellent pas `supabase` directement.
 - Utiliser `check()` pour lever les erreurs et `num()` pour normaliser les `numeric` renvoyés en chaîne par PostgREST.
 - Les messages d'erreur affichés passent par `errorMessage()` (`src/lib/supabase.ts`) ; ajouter un cas si un nouveau code Postgres doit être traduit.
-- Les écritures qui touchent plusieurs tables (opération + ventilation, échéancier) passent par des fonctions SQL (`save_transaction`, `save_scheduled_transaction`, `create_transactions_from_schedule`) pour rester atomiques.
+- Les écritures qui touchent plusieurs lignes (opération + budget imputé, échéancier) passent par des fonctions SQL (`save_transaction`, `save_scheduled_transaction`, `create_transactions_from_schedule`) pour rester atomiques.
 - Les types partagés sont dans `src/lib/types.ts`.
 
 **Logique métier**
-- Les calculs (rapports, prévision du solde, ventilation, dates) vont dans `src/lib`, sous forme de fonctions pures testées dans un `*.test.ts` voisin.
+- Les calculs (prévision du solde, dates) vont dans `src/lib`, sous forme de fonctions pures testées dans un `*.test.ts` voisin.
 - Tout changement de logique dans `src/lib` s'accompagne de tests.
 - La projection de l'échéancier côté front (`advanceSchedule` dans `balance.ts`) doit suivre la même règle de jour du mois que la fonction SQL `schedule_advance`.
 
