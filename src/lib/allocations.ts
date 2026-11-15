@@ -51,3 +51,22 @@ export function computeAllocations(totalCents: number, rows: AllocationRow[]): A
   }
   return { allocations: rows.map((r, i) => ({ budgetId: r.budgetId, cents: cents[i] })), error: null, remaining }
 }
+
+/** Nombre de lignes de budget proposées dans la liste déroulante */
+export const BUDGET_CHOICES_LIMIT = 10
+
+/**
+ * Lignes de budget proposées dans la répartition : les `limit` plus récentes
+ * (la liste reçue est triée de la plus récente à la plus ancienne), plus celles
+ * déjà choisies qui seraient plus anciennes, pour ne pas les perdre en modification.
+ */
+export function recentBudgetChoices<T extends { id: string }>(
+  budgets: T[],
+  selectedIds: string[],
+  limit = BUDGET_CHOICES_LIMIT,
+): T[] {
+  const recent = budgets.slice(0, limit)
+  const shown = new Set(recent.map((b) => b.id))
+  const older = budgets.slice(limit).filter((b) => selectedIds.includes(b.id) && !shown.has(b.id))
+  return [...recent, ...older]
+}
