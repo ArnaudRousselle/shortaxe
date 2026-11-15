@@ -75,6 +75,7 @@ supabase/
   2. même changement reporté dans `supabase/schema.sql` ;
   3. migration appliquée sur la base de production (SQL Editor Supabase) **avant** de merger la PR, puisque le merge redéploie le site immédiatement.
 - Projet Supabase de production : `shortaxe` (réf. `slgovycftiqvyzdfbkls`). Ne pas modifier la base de production sans accord explicite.
+- Projet Supabase de développement : `shortaxe-dev` (réf. `rpiouzqephpuomimlfld`), utilisé par les déploiements Preview de la branche `develop`. Appliquer les migrations ici en premier.
 
 ## Git
 

@@ -77,6 +77,18 @@ Une GitHub Action ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) véri
 
 Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'utiliser comme une application.
 
+### 4. Environnement de développement (branche `develop`)
+
+| Branche | Site | Base Supabase |
+|---|---|---|
+| `main` | production (`https://shortaxe.vercel.app`) | `shortaxe` |
+| `develop` | déploiement Preview Vercel de la branche | `shortaxe-dev` (données de test) |
+
+- Dans Vercel, `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` sont définies une seconde fois en **Preview**, limitées à la branche `develop`, avec les valeurs de `shortaxe-dev`.
+- Les nouvelles fonctionnalités partent de `develop` ; une PR `develop` → `main` met en production.
+- Une migration s'applique d'abord sur `shortaxe-dev`, puis sur `shortaxe` avant le merge dans `main`.
+- Sur le plan gratuit, Supabase met en pause un projet inactif depuis une semaine : le relancer depuis le tableau de bord.
+
 ---
 
 ## Modèle de données
