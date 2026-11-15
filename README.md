@@ -1,6 +1,6 @@
 # Shortaxe
 
-Application web de gestion des comptes de la famille : plusieurs comptes bancaires, opérations ventilées sur plusieurs catégories, budgets annuels par catégorie, rapports mensuels et annuels, export JSON.
+Application web de gestion des comptes de la famille : plusieurs comptes bancaires, opérations ventilées sur plusieurs catégories, budgets annuels par catégorie, rapports mensuels et annuels.
 
 - **Front** : React 19 + TypeScript (Vite), Tailwind CSS v4, React Router
 - **Données et connexion** : Supabase (PostgreSQL + Auth)
@@ -18,7 +18,7 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 | Rapports | Bilan mensuel ou annuel : recettes, dépenses, budgets, détail mois par mois |
 | Évolution | Graphique du solde jour par jour (tous les comptes ou un seul) : historique réel et prévision tenant compte de l'échéancier ; par défaut d'il y a 1 an à dans 2 mois |
 | Comptes / Catégories | Création, modification, archivage |
-| Réglages | Export de toutes les données en JSON |
+| Réglages | Accès aux autres écrans, déconnexion |
 
 **Ventilation** : une opération peut être répartie sur plusieurs catégories, en saisissant le montant de chaque part en euros (ex. Intermarché 100 € : 30 € Loisirs, 70 € Courses). La base de données vérifie que la somme de la ventilation est égale au montant.
 
@@ -117,7 +117,7 @@ Le « dépensé » d'une catégorie correspond aux dépenses moins les rembourse
 
 ## Sauvegarde
 
-**Réglages → Exporter en JSON** télécharge un fichier `shortaxe-sauvegarde-AAAA-MM-JJ.json` contenant toutes les tables. Supabase fait aussi ses propres sauvegardes quotidiennes (plan gratuit : rétention limitée).
+Les sauvegardes sont assurées par Supabase (sauvegardes quotidiennes ; plan gratuit : rétention limitée).
 
 ## Structure du code
 
