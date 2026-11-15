@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
-import { listTransactions, setTransactionChecked } from '../lib/api'
+import { getTransaction, listTransactions, setTransactionChecked } from '../lib/api'
 import { addMonths, currentMonth, formatDay, yearStart } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import { useAsync } from '../lib/useAsync'
@@ -22,6 +22,10 @@ export function TransactionsPage() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [creating, setCreating] = useState(false)
+  // Ligne de budget sur laquelle imputer la nouvelle opération (bouton « + »)
+  const [budgetParent, setBudgetParent] = useState<Transaction | null>(null)
+  // Budget de l'opération imputée en cours de modification
+  const [editingBudget, setEditingBudget] = useState<Transaction | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const from = period === 'mois' ? month : yearStart(year)
@@ -29,6 +33,33 @@ export function TransactionsPage() {
 
   const load = useCallback(() => listTransactions({ from, to, accountId: accountId || undefined }), [from, to, accountId])
   const { data, loading, error, reload, setData } = useAsync(load, [load])
+
+  const budgetLabels = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const t of data ?? []) if (t.is_budget) map[t.id] = t.label
+    return map
+  }, [data])
+
+  // Budget de l'opération modifiée : déjà chargé, sinon lu en base (autre période)
+  useEffect(() => {
+    const id = editing?.budget_id
+    if (!id) {
+      setEditingBudget(null)
+      return
+    }
+    const found = data?.find((t) => t.id === id)
+    if (found) {
+      setEditingBudget(found)
+      return
+    }
+    let alive = true
+    getTransaction(id)
+      .then((b) => alive && setEditingBudget(b))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [editing, data])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -80,7 +111,14 @@ export function TransactionsPage() {
   function onSaved() {
     setEditing(null)
     setCreating(false)
+    setBudgetParent(null)
     void reload()
+  }
+
+  function addToBudget(t: Transaction) {
+    setEditing(null)
+    setBudgetParent(t)
+    setCreating(true)
   }
 
   return (
@@ -88,7 +126,7 @@ export function TransactionsPage() {
       <PageHeader
         title="Opérations"
         actions={
-          <button className="btn-primary hidden md:inline-flex" onClick={() => setCreating(true)}>
+          <button className="btn-primary hidden md:inline-flex" onClick={() => { setBudgetParent(null); setCreating(true) }}>
             <IconPlus /> Nouvelle opération
           </button>
         }
@@ -157,7 +195,14 @@ export function TransactionsPage() {
               <h2 className="mb-1 px-1 text-xs font-medium tracking-wide text-slate-500 uppercase">{formatDay(g.date)}</h2>
               <ul className="card divide-y divide-slate-100 overflow-hidden">
                 {g.items.map((t) => (
-                  <TransactionRow key={t.id} transaction={t} onClick={() => setEditing(t)} onToggleChecked={() => void toggleChecked(t)} />
+                  <TransactionRow
+                    key={t.id}
+                    transaction={t}
+                    onClick={() => setEditing(t)}
+                    onToggleChecked={() => void toggleChecked(t)}
+                    onAddToBudget={t.is_budget ? () => addToBudget(t) : undefined}
+                    budgetLabel={t.budget_id ? budgetLabels[t.budget_id] : undefined}
+                  />
                 ))}
               </ul>
             </section>
@@ -168,7 +213,7 @@ export function TransactionsPage() {
       {/* Bouton flottant (mobile) */}
       <button
         className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-700 text-white shadow-lg md:hidden"
-        onClick={() => setCreating(true)}
+        onClick={() => { setBudgetParent(null); setCreating(true) }}
         aria-label="Nouvelle opération"
       >
         <IconPlus className="h-7 w-7" />
@@ -177,10 +222,12 @@ export function TransactionsPage() {
       <TransactionModal
         open={creating || editing !== null}
         transaction={editing}
+        budget={editing ? editingBudget : budgetParent}
         defaultAccountId={accountId || undefined}
         onClose={() => {
           setCreating(false)
           setEditing(null)
+          setBudgetParent(null)
         }}
         onSaved={onSaved}
       />

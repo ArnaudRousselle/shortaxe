@@ -26,9 +26,6 @@ export const IconHome = (p: P) => (
 export const IconList = (p: P) => (
   <Base {...p}><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></Base>
 )
-export const IconTarget = (p: P) => (
-  <Base {...p}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></Base>
-)
 export const IconChart = (p: P) => (
   <Base {...p}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></Base>
 )
@@ -52,9 +49,6 @@ export const IconChevronLeft = (p: P) => (
 )
 export const IconChevronRight = (p: P) => (
   <Base {...p}><path d="m9 18 6-6-6-6" /></Base>
-)
-export const IconDownload = (p: P) => (
-  <Base {...p}><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></Base>
 )
 export const IconLogout = (p: P) => (
   <Base {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></Base>

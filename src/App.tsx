@@ -11,7 +11,6 @@ import { isSupabaseConfigured } from './lib/supabase'
 import { DashboardPage } from './pages/DashboardPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { SchedulePage } from './pages/SchedulePage'
-import { BudgetsPage } from './pages/BudgetsPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { BalancePage } from './pages/BalancePage'
 import { AccountsPage } from './pages/AccountsPage'
@@ -66,7 +65,6 @@ function Gate() {
           <Route index element={<DashboardPage />} />
           <Route path="operations" element={<TransactionsPage />} />
           <Route path="echeancier" element={<SchedulePage />} />
-          <Route path="budgets" element={<BudgetsPage />} />
           <Route path="rapports" element={<ReportsPage />} />
           <Route path="evolution" element={<BalancePage />} />
           <Route path="comptes" element={<AccountsPage />} />

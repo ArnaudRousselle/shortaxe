@@ -21,7 +21,7 @@ export function errorMessage(error: unknown): string {
   if (!e) return 'Erreur inconnue'
   switch (e.code) {
     case '23503':
-      return 'Cet élément est utilisé ailleurs (opérations, budgets…). Archive-le plutôt que de le supprimer.'
+      return 'Cet élément est utilisé ailleurs (opérations, échéancier…). Archive-le plutôt que de le supprimer.'
     case '23505':
       return 'Ce nom existe déjà.'
     case '42501':

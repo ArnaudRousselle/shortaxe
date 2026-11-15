@@ -1,11 +1,7 @@
-import { monthlyBudgetsFromAnnual } from './budget'
-import { addMonths } from './format'
 import { supabase } from './supabase'
 import type {
   Account,
   AccountBalance,
-  AnnualBudget,
-  Budget,
   Category,
   CategoryMonthlyTotal,
   ScheduledTransaction,
@@ -98,6 +94,7 @@ function normalizeTx(t: Transaction): Transaction {
   return {
     ...t,
     amount: num(t.amount),
+    budget_overrun: num(t.budget_overrun),
     transaction_splits: (t.transaction_splits ?? []).map((s) => ({ ...s, amount: num(s.amount) })),
   }
 }
@@ -134,8 +131,18 @@ export async function saveTransaction(t: TransactionInput): Promise<string> {
     p_notes: t.notes,
     p_is_checked: t.is_checked,
     p_splits: t.splits,
+    p_is_budget: t.is_budget,
+    p_budget_id: t.budget_id,
   })
   return check(res) as string
+}
+
+/** Une opération (pour retrouver la ligne de budget d'une opération imputée) */
+export async function getTransaction(id: string): Promise<Transaction | null> {
+  const row = check(
+    await supabase.from('transactions').select('*, transaction_splits(*)').eq('id', id).maybeSingle(),
+  ) as Transaction | null
+  return row ? normalizeTx(row) : null
 }
 
 export async function setTransactionChecked(id: string, checked: boolean): Promise<void> {
@@ -181,6 +188,7 @@ export async function saveScheduled(t: ScheduledTransactionInput): Promise<strin
     p_frequency_months: t.frequency_months,
     p_next_date: t.next_date,
     p_splits: t.splits,
+    p_is_budget: t.is_budget,
   })
   return check(res) as string
 }
@@ -205,96 +213,9 @@ export async function countDueScheduled(before: string): Promise<number> {
   return res.count ?? 0
 }
 
-// ---------------------------------------------------------------- Budgets
-
-export async function listAnnualBudgets(fromYear: number, toYear: number = fromYear): Promise<AnnualBudget[]> {
-  const rows = check(
-    await supabase.from('annual_budgets').select('*').gte('year', fromYear).lte('year', toYear),
-  ) as AnnualBudget[]
-  return rows.map((b) => ({ ...b, year: Number(b.year), amount: num(b.amount) }))
-}
-
-/** Parts mensuelles des budgets annuels pour les mois de [from, to[ (accueil, rapports). */
-export async function listBudgets(from: string, to: string): Promise<Budget[]> {
-  const lastMonth = addMonths(to, -1)
-  const annual = await listAnnualBudgets(Number(from.slice(0, 4)), Number(lastMonth.slice(0, 4)))
-  return monthlyBudgetsFromAnnual(annual, from, to)
-}
-
-/** Enregistre les budgets annuels d'une année. amount = null supprime le budget de la catégorie. */
-export async function saveAnnualBudgets(year: number, rows: { category_id: string; amount: number | null }[]): Promise<void> {
-  const toUpsert = rows
-    .filter((r) => r.amount !== null)
-    .map((r) => ({ category_id: r.category_id, year, amount: r.amount as number }))
-  const toDelete = rows.filter((r) => r.amount === null).map((r) => r.category_id)
-  if (toUpsert.length) {
-    check(await supabase.from('annual_budgets').upsert(toUpsert, { onConflict: 'category_id,year' }))
-  }
-  if (toDelete.length) {
-    check(await supabase.from('annual_budgets').delete().eq('year', year).in('category_id', toDelete))
-  }
-}
-
 export async function getCategoryTotals(from: string, to: string): Promise<CategoryMonthlyTotal[]> {
   const rows = check(
     await supabase.from('category_monthly_totals').select('*').gte('month', from).lt('month', to),
   ) as CategoryMonthlyTotal[]
   return rows.map((r) => ({ ...r, total: num(r.total) }))
-}
-
-// ---------------------------------------------------------------- Export
-
-async function fetchAll(table: string): Promise<unknown[]> {
-  const out: unknown[] = []
-  for (let offset = 0; ; offset += PAGE) {
-    const rows = check(
-      await supabase.from(table).select('*').order('id').range(offset, offset + PAGE - 1),
-    ) as unknown[]
-    out.push(...rows)
-    if (rows.length < PAGE) break
-  }
-  return out
-}
-
-export async function exportAll(): Promise<object> {
-  const [
-    accounts,
-    categories,
-    transactions,
-    transaction_splits,
-    annual_budgets,
-    scheduled_transactions,
-    scheduled_transaction_splits,
-  ] = await Promise.all([
-    fetchAll('accounts'),
-    fetchAll('categories'),
-    fetchAll('transactions'),
-    fetchAll('transaction_splits'),
-    fetchAll('annual_budgets'),
-    fetchAll('scheduled_transactions'),
-    fetchAll('scheduled_transaction_splits'),
-  ])
-  return {
-    app: 'shortaxe',
-    format_version: 3,
-    exported_at: new Date().toISOString(),
-    counts: {
-      accounts: accounts.length,
-      categories: categories.length,
-      transactions: transactions.length,
-      transaction_splits: transaction_splits.length,
-      annual_budgets: annual_budgets.length,
-      scheduled_transactions: scheduled_transactions.length,
-      scheduled_transaction_splits: scheduled_transaction_splits.length,
-    },
-    data: {
-      accounts,
-      categories,
-      transactions,
-      transaction_splits,
-      annual_budgets,
-      scheduled_transactions,
-      scheduled_transaction_splits,
-    },
-  }
 }

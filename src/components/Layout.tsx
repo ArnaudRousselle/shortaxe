@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Logo } from './Logo'
-import { IconCalendar, IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTarget, IconTrend, IconWallet } from './Icons'
+import { IconCalendar, IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTrend, IconWallet } from './Icons'
 
 type NavItem = { to: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }
 
@@ -10,7 +10,6 @@ const mainNav: NavItem[] = [
   { to: '/', label: 'Accueil', icon: IconHome },
   { to: '/operations', label: 'Opérations', icon: IconList },
   { to: '/echeancier', label: 'Échéancier', icon: IconCalendar },
-  { to: '/budgets', label: 'Budgets', icon: IconTarget },
   { to: '/rapports', label: 'Rapports', icon: IconChart },
   { to: '/evolution', label: 'Évolution', icon: IconTrend },
 ]

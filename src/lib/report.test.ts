@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { buildCategoryLines, cashflow, round2, totalsFromTransactions } from './report'
-import type { Budget, Category, Split, Transaction } from './types'
+import type { Category, Split, Transaction } from './types'
 
 function category(id: string, name: string): Category {
   return { id, name, color: '#000', is_archived: false, created_at: '2026-01-01T00:00:00Z' }
-}
-
-function budget(category_id: string, amount: number, month = '2026-11-01'): Budget {
-  return { id: `${category_id}-${month}-${amount}`, category_id, month, amount }
 }
 
 let txId = 0
@@ -20,6 +16,9 @@ function tx(date: string, amount: number, splits: Omit<Split, 'id' | 'transactio
     amount,
     notes: null,
     is_checked: false,
+    is_budget: false,
+    budget_id: null,
+    budget_overrun: 0,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     transaction_splits: splits,
@@ -41,44 +40,43 @@ describe('buildCategoryLines', () => {
   const sante = category('sante', 'Santé')
   const auto = category('auto', 'Auto')
 
-  it('calcule budget, dépensé et reste ; les dépenses (négatives) deviennent positives', () => {
-    const lines = buildCategoryLines([alim], [budget('alim', 400)], [{ category_id: 'alim', total: -150.25 }])
-    expect(lines).toEqual([{ category: alim, budget: 400, spent: 150.25, remaining: 249.75 }])
+  it('calcule le dépensé ; les dépenses (négatives) deviennent positives', () => {
+    const lines = buildCategoryLines([alim], [{ category_id: 'alim', total: -150.25 }])
+    expect(lines).toEqual([{ category: alim, spent: 150.25 }])
   })
 
   it('déduit les remboursements du dépensé', () => {
-    const [line] = buildCategoryLines([sante], [], [{ category_id: 'sante', total: 30 }])
-    expect(line).toMatchObject({ budget: 0, spent: -30, remaining: 30 })
+    const [line] = buildCategoryLines([sante], [{ category_id: 'sante', total: 30 }])
+    expect(line).toEqual({ category: sante, spent: -30 })
   })
 
-  it('additionne plusieurs budgets et plusieurs totaux pour une même catégorie', () => {
+  it('additionne plusieurs totaux pour une même catégorie', () => {
     const [line] = buildCategoryLines(
       [alim],
-      [budget('alim', 400, '2026-10-01'), budget('alim', 450, '2026-11-01')],
       [
         { category_id: 'alim', total: -300.1 },
         { category_id: 'alim', total: -200.2 },
       ],
     )
-    expect(line).toMatchObject({ budget: 850, spent: 500.3, remaining: 349.7 })
+    expect(line.spent).toBe(500.3)
   })
 
-  it('ignore les catégories sans budget ni mouvement', () => {
-    const lines = buildCategoryLines([alim, loisirs, sante], [budget('alim', 100)], [{ category_id: 'sante', total: -10 }])
-    expect(lines.map((l) => l.category.id)).toEqual(['alim', 'sante'])
+  it('ignore les catégories sans mouvement', () => {
+    const lines = buildCategoryLines([alim, loisirs, sante], [{ category_id: 'sante', total: -10 }])
+    expect(lines.map((l) => l.category.id)).toEqual(['sante'])
   })
 
-  it('trie par budget, puis dépensé, puis nom', () => {
+  it('trie par dépensé décroissant, puis nom', () => {
     const lines = buildCategoryLines(
       [sante, auto, alim, loisirs],
-      [budget('alim', 400), budget('loisirs', 100)],
       [
         { category_id: 'sante', total: -50 },
         { category_id: 'auto', total: -50 },
         { category_id: 'loisirs', total: -20 },
+        { category_id: 'alim', total: -400 },
       ],
     )
-    expect(lines.map((l) => l.category.id)).toEqual(['alim', 'loisirs', 'auto', 'sante'])
+    expect(lines.map((l) => l.category.id)).toEqual(['alim', 'auto', 'sante', 'loisirs'])
   })
 
   it('trie les noms à la française (accents)', () => {
@@ -87,7 +85,6 @@ describe('buildCategoryLines', () => {
     const ent = category('ent', 'Entretien')
     const lines = buildCategoryLines(
       [fin, eco, ent],
-      [],
       ['fin', 'eco', 'ent'].map((category_id) => ({ category_id, total: -10 })),
     )
     expect(lines.map((l) => l.category.name)).toEqual(['Économies', 'Entretien', 'Frais'])

@@ -24,11 +24,31 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="card p-8 text-center text-sm text-slate-500">{children}</div>
 }
 
-export function Amount({ value, signed = true, className = '' }: { value: number; signed?: boolean; className?: string }) {
-  const color = value > 0 ? 'text-emerald-700' : value < 0 ? 'text-slate-900' : 'text-slate-500'
+export function Amount({
+  value,
+  signed = true,
+  muted = false,
+  className = '',
+}: {
+  value: number
+  signed?: boolean
+  /** Gris clair (lignes de budget) */
+  muted?: boolean
+  className?: string
+}) {
+  const color = muted ? 'text-slate-400' : value > 0 ? 'text-emerald-700' : value < 0 ? 'text-slate-900' : 'text-slate-500'
   return (
     <span className={`tabular-nums whitespace-nowrap ${color} ${className}`}>
       {signed ? formatSignedEuro(value) : formatEuro(value)}
+    </span>
+  )
+}
+
+/** Petite étiquette « Budget » à côté d'un libellé */
+export function BudgetBadge() {
+  return (
+    <span className="ml-2 inline-block rounded border border-slate-300 px-1.5 py-px align-middle text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+      Budget
     </span>
   )
 }
@@ -61,20 +81,6 @@ export function YearPicker({ year, onChange }: { year: number; onChange: (y: num
       <button className="btn-ghost rounded-l-none" onClick={() => onChange(year + 1)} aria-label="Année suivante">
         <IconChevronRight />
       </button>
-    </div>
-  )
-}
-
-/** Barre de consommation du budget */
-export function BudgetBar({ spent, budget, color }: { spent: number; budget: number; color?: string }) {
-  const ratio = budget > 0 ? spent / budget : spent > 0 ? 1.01 : 0
-  const pct = Math.max(0, Math.min(100, ratio * 100))
-  const over = ratio > 1
-  const warn = !over && ratio > 0.85
-  const fill = over ? '#dc2626' : warn ? '#d97706' : (color ?? '#0d9488')
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: fill }} />
     </div>
   )
 }

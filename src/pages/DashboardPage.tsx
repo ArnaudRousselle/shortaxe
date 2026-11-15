@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../data/DataProvider'
-import { countDueScheduled, getCategoryTotals, listBalances, listBudgets, listTransactions } from '../lib/api'
+import { countDueScheduled, getCategoryTotals, listBalances, listTransactions } from '../lib/api'
 import { addMonths, currentMonth, formatEuro, formatMonth } from '../lib/format'
 import { buildCategoryLines, round2 } from '../lib/report'
 import { useAsync } from '../lib/useAsync'
 import type { Transaction } from '../lib/types'
-import { Amount, BudgetBar, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
+import { Amount, CategoryDot, EmptyState, ErrorBanner, Loading, PageHeader } from '../components/ui'
 import { TransactionModal } from '../components/TransactionModal'
 import { TransactionRow } from '../components/TransactionRow'
 import { IconChevronRight, IconPlus } from '../components/Icons'
@@ -19,25 +19,24 @@ export function DashboardPage() {
 
   const load = useCallback(async () => {
     const next = addMonths(month, 1)
-    const [balances, budgets, totals, recent, dueCount] = await Promise.all([
+    const [balances, totals, recent, dueCount] = await Promise.all([
       listBalances(),
-      listBudgets(month, next),
       getCategoryTotals(month, next),
       listTransactions({ limit: 8 }),
       countDueScheduled(next).catch(() => 0),
     ])
-    return { balances, budgets, totals, recent, dueCount }
+    return { balances, totals, recent, dueCount }
   }, [month])
   const { data, loading, error, reload } = useAsync(load, [load])
 
   const activeAccounts = accounts.filter((a) => !a.is_archived)
   const total = round2(activeAccounts.reduce((s, a) => s + (data?.balances[a.id]?.balance ?? 0), 0))
   const lines = useMemo(
-    () => (data ? buildCategoryLines(categories, data.budgets, data.totals).filter((l) => l.budget > 0) : []),
+    () => (data ? buildCategoryLines(categories, data.totals).filter((l) => l.spent > 0) : []),
     [data, categories],
   )
-  const totalBudget = round2(lines.reduce((s, l) => s + l.budget, 0))
   const totalSpent = round2(lines.reduce((s, l) => s + l.spent, 0))
+  const maxSpent = lines.reduce((m, l) => Math.max(m, l.spent), 0)
 
   function onSaved() {
     setCreating(false)
@@ -106,25 +105,20 @@ export function DashboardPage() {
             </div>
           </section>
 
-          {/* Budgets du mois */}
+          {/* Dépenses du mois par catégorie */}
           <section>
             <div className="mb-2 flex items-baseline justify-between">
-              <h2 className="text-lg font-semibold">Budgets — {formatMonth(month)}</h2>
-              <Link to="/budgets" className="text-sm text-brand-700">Modifier</Link>
+              <h2 className="text-lg font-semibold">Dépenses — {formatMonth(month)}</h2>
+              <Link to="/rapports" className="text-sm text-brand-700">Rapports</Link>
             </div>
             {lines.length === 0 ? (
-              <EmptyState>
-                Aucun budget ce mois-ci. <Link className="font-medium text-brand-700 underline" to="/budgets">Définir les budgets</Link>
-              </EmptyState>
+              <EmptyState>Aucune dépense catégorisée ce mois-ci.</EmptyState>
             ) : (
               <div className="card space-y-3 p-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Reste à dépenser</span>
-                  <span className={`font-semibold tabular-nums ${totalBudget - totalSpent < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                    {formatEuro(round2(totalBudget - totalSpent))} sur {formatEuro(totalBudget)}
-                  </span>
+                  <span className="text-slate-500">Total dépensé</span>
+                  <span className="font-semibold tabular-nums">{formatEuro(totalSpent)}</span>
                 </div>
-                <BudgetBar spent={totalSpent} budget={totalBudget} />
                 <ul className="space-y-3 pt-2">
                   {lines.map((l) => (
                     <li key={l.category.id}>
@@ -133,11 +127,14 @@ export function DashboardPage() {
                           <CategoryDot color={l.category.color} />
                           <span className="truncate">{l.category.name}</span>
                         </span>
-                        <span className={`tabular-nums ${l.remaining < 0 ? 'font-semibold text-red-600' : 'text-slate-600'}`}>
-                          {l.remaining < 0 ? `−${formatEuro(-l.remaining)}` : formatEuro(l.remaining)}
-                        </span>
+                        <span className="tabular-nums text-slate-600">{formatEuro(l.spent)}</span>
                       </div>
-                      <BudgetBar spent={l.spent} budget={l.budget} color={l.category.color} />
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${maxSpent > 0 ? (l.spent / maxSpent) * 100 : 0}%`, backgroundColor: l.category.color }}
+                        />
+                      </div>
                     </li>
                   ))}
                 </ul>
