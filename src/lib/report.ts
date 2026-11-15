@@ -1,36 +1,24 @@
-import type { Budget, Category, CategoryMonthlyTotal, Transaction } from './types'
+import type { Category, CategoryMonthlyTotal, Transaction } from './types'
 import { monthStart } from './format'
 
 export type CategoryLine = {
   category: Category
-  budget: number
   /** Dépensé net (dépenses − remboursements) : positif quand on a dépensé */
   spent: number
-  remaining: number
 }
 
 /**
- * Lignes budget / dépensé / reste pour une période donnée.
- * Inclut les catégories qui ont un budget ou des mouvements sur la période.
+ * Dépensé par catégorie pour une période donnée.
+ * Inclut les catégories qui ont des mouvements sur la période, triées par dépensé décroissant.
  */
-export function buildCategoryLines(
-  categories: Category[],
-  budgets: Budget[],
-  totals: { category_id: string; total: number }[],
-): CategoryLine[] {
-  const budgetBy = new Map<string, number>()
-  for (const b of budgets) budgetBy.set(b.category_id, (budgetBy.get(b.category_id) ?? 0) + b.amount)
+export function buildCategoryLines(categories: Category[], totals: { category_id: string; total: number }[]): CategoryLine[] {
   const spentBy = new Map<string, number>()
   for (const t of totals) spentBy.set(t.category_id, (spentBy.get(t.category_id) ?? 0) - t.total)
 
   return categories
-    .filter((c) => budgetBy.has(c.id) || spentBy.has(c.id))
-    .map((c) => {
-      const budget = round2(budgetBy.get(c.id) ?? 0)
-      const spent = round2(spentBy.get(c.id) ?? 0)
-      return { category: c, budget, spent, remaining: round2(budget - spent) }
-    })
-    .sort((a, b) => b.budget - a.budget || b.spent - a.spent || a.category.name.localeCompare(b.category.name, 'fr'))
+    .filter((c) => spentBy.has(c.id))
+    .map((c) => ({ category: c, spent: round2(spentBy.get(c.id) ?? 0) }))
+    .sort((a, b) => b.spent - a.spent || a.category.name.localeCompare(b.category.name, 'fr'))
 }
 
 /** Totaux par catégorie et par mois, calculés à partir des opérations */

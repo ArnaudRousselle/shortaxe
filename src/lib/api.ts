@@ -1,11 +1,7 @@
-import { monthlyBudgetsFromAnnual } from './budget'
-import { addMonths } from './format'
 import { supabase } from './supabase'
 import type {
   Account,
   AccountBalance,
-  AnnualBudget,
-  Budget,
   Category,
   CategoryMonthlyTotal,
   ScheduledTransaction,
@@ -203,36 +199,6 @@ export async function countDueScheduled(before: string): Promise<number> {
     .lt('next_date', before)
   if (res.error) throw res.error
   return res.count ?? 0
-}
-
-// ---------------------------------------------------------------- Budgets
-
-export async function listAnnualBudgets(fromYear: number, toYear: number = fromYear): Promise<AnnualBudget[]> {
-  const rows = check(
-    await supabase.from('annual_budgets').select('*').gte('year', fromYear).lte('year', toYear),
-  ) as AnnualBudget[]
-  return rows.map((b) => ({ ...b, year: Number(b.year), amount: num(b.amount) }))
-}
-
-/** Parts mensuelles des budgets annuels pour les mois de [from, to[ (accueil, rapports). */
-export async function listBudgets(from: string, to: string): Promise<Budget[]> {
-  const lastMonth = addMonths(to, -1)
-  const annual = await listAnnualBudgets(Number(from.slice(0, 4)), Number(lastMonth.slice(0, 4)))
-  return monthlyBudgetsFromAnnual(annual, from, to)
-}
-
-/** Enregistre les budgets annuels d'une année. amount = null supprime le budget de la catégorie. */
-export async function saveAnnualBudgets(year: number, rows: { category_id: string; amount: number | null }[]): Promise<void> {
-  const toUpsert = rows
-    .filter((r) => r.amount !== null)
-    .map((r) => ({ category_id: r.category_id, year, amount: r.amount as number }))
-  const toDelete = rows.filter((r) => r.amount === null).map((r) => r.category_id)
-  if (toUpsert.length) {
-    check(await supabase.from('annual_budgets').upsert(toUpsert, { onConflict: 'category_id,year' }))
-  }
-  if (toDelete.length) {
-    check(await supabase.from('annual_budgets').delete().eq('year', year).in('category_id', toDelete))
-  }
 }
 
 export async function getCategoryTotals(from: string, to: string): Promise<CategoryMonthlyTotal[]> {

@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
-import { listBudgets, listTransactions } from '../lib/api'
+import { listTransactions } from '../lib/api'
 import { addMonths, currentMonth, formatEuro, formatMonthShort, monthsOfYear, yearStart } from '../lib/format'
 import { buildCategoryLines, cashflow, round2, totalsFromTransactions, type CategoryLine } from '../lib/report'
 import { useAsync } from '../lib/useAsync'
-import { Amount, BudgetBar, CategoryDot, EmptyState, ErrorBanner, Loading, MonthPicker, PageHeader, Segmented, YearPicker } from '../components/ui'
+import { Amount, CategoryDot, EmptyState, ErrorBanner, Loading, MonthPicker, PageHeader, Segmented, YearPicker } from '../components/ui'
 
 type Period = 'mois' | 'annee'
 
@@ -32,51 +32,27 @@ function SummaryCards({ income, expense, net, uncategorized }: ReturnType<typeof
 }
 
 function CategoryLines({ lines }: { lines: CategoryLine[] }) {
-  if (lines.length === 0) return <EmptyState>Aucune dépense ni budget sur cette période.</EmptyState>
-  const budgeted = lines.filter((l) => l.budget > 0)
-  const totalBudget = round2(budgeted.reduce((s, l) => s + l.budget, 0))
-  const totalSpent = round2(budgeted.reduce((s, l) => s + l.spent, 0))
+  if (lines.length === 0) return <EmptyState>Aucun mouvement catégorisé sur cette période.</EmptyState>
+  const totalSpent = round2(lines.reduce((s, l) => s + l.spent, 0))
   return (
     <div className="card overflow-hidden">
       <ul className="divide-y divide-slate-100">
         {lines.map((l) => (
-          <li key={l.category.id} className="px-4 py-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2 font-medium">
-                <CategoryDot color={l.category.color} />
-                <span className="truncate">{l.category.name}</span>
-              </span>
-              {l.budget > 0 ? (
-                <span className={`text-sm font-semibold tabular-nums ${l.remaining < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                  {l.remaining < 0 ? `Dépassé de ${formatEuro(-l.remaining)}` : `Reste ${formatEuro(l.remaining)}`}
-                </span>
-              ) : (
-                <span className="text-xs text-slate-400">Sans budget</span>
-              )}
-            </div>
-            <div className="mt-1 flex justify-between text-xs text-slate-500 tabular-nums">
-              <span>{l.spent < 0 ? `Recettes ${formatEuro(-l.spent)}` : `Dépensé ${formatEuro(l.spent)}`}</span>
-              {l.budget > 0 && <span>Budget {formatEuro(l.budget)}</span>}
-            </div>
-            {l.budget > 0 && (
-              <div className="mt-2">
-                <BudgetBar spent={l.spent} budget={l.budget} color={l.category.color} />
-              </div>
-            )}
+          <li key={l.category.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
+            <span className="flex min-w-0 items-center gap-2 font-medium">
+              <CategoryDot color={l.category.color} />
+              <span className="truncate">{l.category.name}</span>
+            </span>
+            <span className={`text-sm tabular-nums ${l.spent < 0 ? 'text-emerald-700' : ''}`}>
+              {l.spent < 0 ? `Recettes ${formatEuro(-l.spent)}` : `Dépensé ${formatEuro(l.spent)}`}
+            </span>
           </li>
         ))}
       </ul>
-      {budgeted.length > 0 && (
-        <div className="flex flex-wrap justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold">
-          <span>Catégories budgétées</span>
-          <span className="tabular-nums">
-            {formatEuro(totalSpent)} / {formatEuro(totalBudget)} ·{' '}
-            <span className={totalBudget - totalSpent < 0 ? 'text-red-600' : 'text-emerald-700'}>
-              reste {formatEuro(round2(totalBudget - totalSpent))}
-            </span>
-          </span>
-        </div>
-      )}
+      <div className="flex justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold">
+        <span>Total net des catégories</span>
+        <span className="tabular-nums">{formatEuro(totalSpent)}</span>
+      </div>
     </div>
   )
 }
@@ -85,13 +61,12 @@ function MonthReport({ month }: { month: string }) {
   const { categories } = useData()
   const load = useCallback(async () => {
     const next = addMonths(month, 1)
-    const [txs, budgets] = await Promise.all([listTransactions({ from: month, to: next }), listBudgets(month, next)])
-    return { txs, budgets }
+    return { txs: await listTransactions({ from: month, to: next }) }
   }, [month])
   const { data, loading, error } = useAsync(load, [load])
 
   const lines = useMemo(
-    () => (data ? buildCategoryLines(categories, data.budgets, totalsFromTransactions(data.txs)) : []),
+    () => (data ? buildCategoryLines(categories, totalsFromTransactions(data.txs)) : []),
     [data, categories],
   )
 
@@ -111,28 +86,21 @@ function YearReport({ year }: { year: number }) {
   const load = useCallback(async () => {
     const from = yearStart(year)
     const to = yearStart(year + 1)
-    const [txs, budgets] = await Promise.all([listTransactions({ from, to }), listBudgets(from, to)])
-    return { txs, budgets }
+    return { txs: await listTransactions({ from, to }) }
   }, [year])
   const { data, loading, error } = useAsync(load, [load])
 
   const view = useMemo(() => {
     if (!data) return null
     const totals = totalsFromTransactions(data.txs)
-    const lines = buildCategoryLines(categories, data.budgets, totals)
-    // Matrice catégorie × mois : dépensé et budget
-    const cell = new Map<string, { spent: number; budget: number }>()
+    const lines = buildCategoryLines(categories, totals)
+    // Matrice catégorie × mois : dépensé
+    const cell = new Map<string, { spent: number }>()
     const key = (c: string, m: string) => `${c}|${m}`
     for (const t of totals) {
       const k = key(t.category_id, t.month)
-      const cur = cell.get(k) ?? { spent: 0, budget: 0 }
+      const cur = cell.get(k) ?? { spent: 0 }
       cur.spent = round2(cur.spent - t.total)
-      cell.set(k, cur)
-    }
-    for (const b of data.budgets) {
-      const k = key(b.category_id, b.month)
-      const cur = cell.get(k) ?? { spent: 0, budget: 0 }
-      cur.budget = round2(cur.budget + b.amount)
       cell.set(k, cur)
     }
     const perMonth = months.map((m) => cashflow(data.txs.filter((t) => t.date.startsWith(m.slice(0, 7)))))
@@ -152,7 +120,7 @@ function YearReport({ year }: { year: number }) {
       </div>
 
       <h2 className="mb-2 text-lg font-semibold">Détail mois par mois</h2>
-      <p className="mb-2 text-xs text-slate-500">Montants dépensés ; en rouge quand le budget du mois est dépassé.</p>
+      <p className="mb-2 text-xs text-slate-500">Montants dépensés (dépenses moins remboursements), arrondis à l’euro.</p>
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[56rem] text-sm tabular-nums">
           <thead>
@@ -175,12 +143,10 @@ function YearReport({ year }: { year: number }) {
                 </td>
                 {months.map((m) => {
                   const c = view.cell.get(view.key(l.category.id, m))
-                  const over = c && c.budget > 0 && c.spent > c.budget
                   return (
                     <td
                       key={m}
-                      className={`px-2 py-2 text-right whitespace-nowrap ${over ? 'font-semibold text-red-600' : c?.spent ? '' : 'text-slate-300'}`}
-                      title={c?.budget ? `Budget ${formatEuro(c.budget)}` : undefined}
+                      className={`px-2 py-2 text-right whitespace-nowrap ${c?.spent ? '' : 'text-slate-300'}`}
                     >
                       {c?.spent ? Math.round(c.spent).toLocaleString('fr-FR') : '—'}
                     </td>

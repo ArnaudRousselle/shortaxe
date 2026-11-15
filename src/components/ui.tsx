@@ -65,20 +65,6 @@ export function YearPicker({ year, onChange }: { year: number; onChange: (y: num
   )
 }
 
-/** Barre de consommation du budget */
-export function BudgetBar({ spent, budget, color }: { spent: number; budget: number; color?: string }) {
-  const ratio = budget > 0 ? spent / budget : spent > 0 ? 1.01 : 0
-  const pct = Math.max(0, Math.min(100, ratio * 100))
-  const over = ratio > 1
-  const warn = !over && ratio > 0.85
-  const fill = over ? '#dc2626' : warn ? '#d97706' : (color ?? '#0d9488')
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: fill }} />
-    </div>
-  )
-}
-
 export function Segmented<T extends string>({
   value,
   options,
