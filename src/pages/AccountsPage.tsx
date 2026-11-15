@@ -167,8 +167,8 @@ export function AccountsPage() {
               <label className="label" htmlFor="acc-pos">Ordre d’affichage</label>
               <input id="acc-pos" type="number" className="input" value={draft.position} onChange={(e) => setDraft({ ...draft, position: Number(e.target.value) || 0 })} />
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="h-4 w-4" checked={draft.is_archived} onChange={(e) => setDraft({ ...draft, is_archived: e.target.checked })} />
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={draft.is_archived} onChange={(e) => setDraft({ ...draft, is_archived: e.target.checked })} />
               Compte archivé (clôturé)
             </label>
             <ErrorBanner message={formError} />

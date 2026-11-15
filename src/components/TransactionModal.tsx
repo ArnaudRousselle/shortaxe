@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { deleteTransaction, listBudgets, recentLabels, saveTransaction } from '../lib/api'
-import { computeAllocations, type AllocationRow } from '../lib/allocations'
+import { computeAllocations, recentBudgetChoices, type AllocationRow } from '../lib/allocations'
 import { centsToInput, formatEuro, parseEuroToCents, todayISO, toCents } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import type { BudgetLine, Transaction } from '../lib/types'
@@ -84,7 +84,15 @@ export function TransactionModal({
   const totalCents = parseEuroToCents(amount)
   const result = useMemo(() => computeAllocations(totalCents ?? 0, rows), [totalCents, rows])
   // Une ligne de budget ne peut pas être répartie sur elle-même
-  const selectableBudgets = useMemo(() => budgets.filter((b) => b.id !== transaction?.id), [budgets, transaction])
+  // Liste limitée aux 10 plus récentes (plus celles déjà choisies)
+  const selectableBudgets = useMemo(
+    () =>
+      recentBudgetChoices(
+        budgets.filter((b) => b.id !== transaction?.id),
+        rows.map((r) => r.budgetId),
+      ),
+    [budgets, transaction, rows],
+  )
 
   function onBudgetChange(checked: boolean) {
     if (checked && rows.length > 0 && !confirm('Une ligne de budget ne peut pas être rattachée à un autre budget : la répartition sera retirée. Continuer ?')) return
@@ -219,14 +227,14 @@ export function TransactionModal({
         </div>
 
         {!isBudget && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="h-4 w-4" checked={isChecked} onChange={(e) => setIsChecked(e.target.checked)} />
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={isChecked} onChange={(e) => setIsChecked(e.target.checked)} />
             Opération pointée (visible sur le relevé bancaire)
           </label>
         )}
 
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => onBudgetChange(e.target.checked)} />
+          <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={isBudget} onChange={(e) => onBudgetChange(e.target.checked)} />
           <span>
             Ligne de budget
             <span className="block text-xs text-slate-500">

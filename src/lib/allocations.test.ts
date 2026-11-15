@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAllocations, type AllocationRow } from './allocations'
+import { computeAllocations, recentBudgetChoices, type AllocationRow } from './allocations'
 
 let k = 0
 const row = (budgetId: string, value = ''): AllocationRow => ({ key: k++, budgetId, value })
@@ -57,5 +57,22 @@ describe('computeAllocations', () => {
   it('refuse un montant invalide ou négatif', () => {
     expect(computeAllocations(15000, [row('courses', 'abc')]).error).toMatch(/invalide/)
     expect(computeAllocations(15000, [row('courses', '-5')]).error).toMatch(/invalide/)
+  })
+})
+
+describe('recentBudgetChoices', () => {
+  const budgets = Array.from({ length: 15 }, (_, i) => ({ id: `b${i}` }))
+  const ids = (list: { id: string }[]) => list.map((b) => b.id)
+
+  it('garde les 10 lignes les plus récentes', () => {
+    expect(ids(recentBudgetChoices(budgets, []))).toEqual(budgets.slice(0, 10).map((b) => b.id))
+  })
+
+  it('ajoute à la fin une ligne plus ancienne déjà choisie', () => {
+    expect(ids(recentBudgetChoices(budgets, ['b12', 'b3', '']))).toEqual([...budgets.slice(0, 10).map((b) => b.id), 'b12'])
+  })
+
+  it('renvoie toute la liste quand elle est courte', () => {
+    expect(ids(recentBudgetChoices(budgets.slice(0, 4), ['b2']))).toEqual(['b0', 'b1', 'b2', 'b3'])
   })
 })

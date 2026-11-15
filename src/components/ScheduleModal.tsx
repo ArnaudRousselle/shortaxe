@@ -216,7 +216,7 @@ export function ScheduleModal({
         </div>
 
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
+          <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
           <span>
             Budget
             <span className="block text-xs text-slate-500">
