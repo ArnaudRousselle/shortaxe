@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useData } from '../data/DataProvider'
 import { listTransactions, setTransactionChecked } from '../lib/api'
-import { addMonths, currentMonth, formatDay, yearStart } from '../lib/format'
+import { addMonths, currentMonth, formatDay, fromCents, toCents, yearStart } from '../lib/format'
 import { errorMessage } from '../lib/supabase'
 import { useAsync } from '../lib/useAsync'
 import type { Transaction } from '../lib/types'
@@ -46,14 +46,16 @@ export function TransactionsPage() {
     })
   }, [data, search])
 
+  // Totaux de la liste affichée, calculés en centimes
   const totals = useMemo(() => {
-    let income = 0
-    let expense = 0
+    let net = 0
+    let checked = 0
     for (const t of filtered) {
-      if (t.amount > 0) income += t.amount
-      else expense += t.amount
+      const cents = toCents(t.amount)
+      net += cents
+      if (t.is_checked) checked += cents
     }
-    return { income, expense, net: income + expense }
+    return { net: fromCents(net), checked: fromCents(checked) }
   }, [filtered])
 
   const byDay = useMemo(() => {
@@ -131,18 +133,14 @@ export function TransactionsPage() {
       </div>
 
       {/* Totaux */}
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <div className="card p-3">
-          <p className="text-xs text-slate-500">Recettes</p>
-          <Amount value={totals.income} className="font-semibold" />
-        </div>
-        <div className="card p-3">
-          <p className="text-xs text-slate-500">Dépenses</p>
-          <Amount value={totals.expense} className="font-semibold" />
-        </div>
+      <div className="mb-4 grid grid-cols-2 gap-2">
         <div className="card p-3">
           <p className="text-xs text-slate-500">Solde</p>
           <Amount value={totals.net} className="font-semibold" />
+        </div>
+        <div className="card p-3">
+          <p className="text-xs text-slate-500">Solde pointé</p>
+          <Amount value={totals.checked} className="font-semibold" />
         </div>
       </div>
 
