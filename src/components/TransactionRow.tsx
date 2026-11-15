@@ -9,25 +9,26 @@ export function TransactionRow({
   onClick,
   onToggleChecked,
   onAddToBudget,
-  budgetLabel,
   showDate,
 }: {
   transaction: Transaction
   onClick: () => void
   onToggleChecked?: () => void
-  /** Ligne de budget : bouton « + » pour saisir une opération imputée dessus */
+  /** Ligne de budget : bouton « + » pour saisir une opération rattachée à ce budget */
   onAddToBudget?: () => void
-  /** Libellé du budget sur lequel l'opération est imputée */
-  budgetLabel?: string
   showDate?: boolean
 }) {
   const muted = t.is_budget
   const { accountById } = useData()
-  const account = accountById[t.account_id]
+  const account = t.account_id ? accountById[t.account_id] : undefined
+  const allocs = t.transaction_budget_allocations
+  // Montant de chaque part affiché sauf si une seule part couvre toute l'opération
+  const showAllocAmounts = allocs.length > 1 || (allocs.length === 1 && allocs[0].amount !== t.amount)
 
   return (
     <li className={`flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 sm:px-4 ${muted ? 'text-slate-400' : ''}`}>
-      {onToggleChecked && (
+      {onToggleChecked && muted && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
+      {onToggleChecked && !muted && (
         <button
           onClick={onToggleChecked}
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
@@ -47,12 +48,13 @@ export function TransactionRow({
           </p>
           <div className={`mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${muted ? 'text-slate-400' : 'text-slate-500'}`}>
             {showDate && <span>{t.date.split('-').reverse().join('/')}</span>}
-            <span className="truncate">{account?.name ?? '?'}</span>
-            {t.budget_id && (
-              <span className="truncate text-slate-400" title="Opération imputée sur un budget">
-                ↳ {budgetLabel ? `Budget ${budgetLabel}` : 'Budget'}
+            {t.account_id && <span className="truncate">{account?.name ?? '?'}</span>}
+            {allocs.map((a) => (
+              <span key={a.budget_id} className="inline-flex max-w-full items-center gap-1 text-slate-400" title="Rattachée à une ligne de budget">
+                <span className="truncate">↳ {a.budget?.label ?? 'Budget'}</span>
+                {showAllocAmounts && <span className="shrink-0 tabular-nums">{formatEuro(Math.abs(a.amount))}</span>}
               </span>
-            )}
+            ))}
           </div>
         </div>
         <div className="shrink-0 text-right">

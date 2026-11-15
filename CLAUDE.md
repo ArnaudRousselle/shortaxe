@@ -55,7 +55,7 @@ supabase/
 - Tous les appels Supabase passent par `src/lib/api.ts` : les pages et composants n'appellent pas `supabase` directement.
 - Utiliser `check()` pour lever les erreurs et `num()` pour normaliser les `numeric` renvoyés en chaîne par PostgREST.
 - Les messages d'erreur affichés passent par `errorMessage()` (`src/lib/supabase.ts`) ; ajouter un cas si un nouveau code Postgres doit être traduit.
-- Les écritures qui touchent plusieurs lignes (opération + budget imputé, échéancier) passent par des fonctions SQL (`save_transaction`, `save_scheduled_transaction`, `create_transactions_from_schedule`) pour rester atomiques.
+- Les écritures qui touchent plusieurs lignes (opération + répartition sur les budgets, échéancier) passent par des fonctions SQL (`save_transaction`, `save_scheduled_transaction`, `create_transactions_from_schedule`) pour rester atomiques.
 - Les types partagés sont dans `src/lib/types.ts`.
 
 **Logique métier**

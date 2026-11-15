@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../data/DataProvider'
-import { countDueScheduled, listBalances, listTransactions } from '../lib/api'
+import { countDueScheduled, listBalances, listBudgets, listTransactions } from '../lib/api'
 import { addMonths, currentMonth, round2 } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import type { Transaction } from '../lib/types'
@@ -18,17 +18,21 @@ export function DashboardPage() {
 
   const load = useCallback(async () => {
     const next = addMonths(month, 1)
-    const [balances, recent, dueCount] = await Promise.all([
+    const [balances, budgets, recent, dueCount] = await Promise.all([
       listBalances(),
+      listBudgets(),
       listTransactions({ limit: 8 }),
       countDueScheduled(next).catch(() => 0),
     ])
-    return { balances, recent, dueCount }
+    return { balances, budgets, recent, dueCount }
   }, [month])
   const { data, loading, error, reload } = useAsync(load, [load])
 
   const activeAccounts = accounts.filter((a) => !a.is_archived)
-  const total = round2(activeAccounts.reduce((s, a) => s + (data?.balances[a.id]?.balance ?? 0), 0))
+  const accountsTotal = round2(activeAccounts.reduce((s, a) => s + (data?.balances[a.id]?.balance ?? 0), 0))
+  // Reste des lignes de budget (sans compte) : dépenses encore prévues
+  const budgetsLeft = round2((data?.budgets ?? []).reduce((s, b) => s + b.amount, 0))
+  const total = round2(accountsTotal + budgetsLeft)
 
   function onSaved() {
     setCreating(false)
@@ -89,10 +93,27 @@ export function DashboardPage() {
                   </li>
                 ))}
               </ul>
-              <div className="flex justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 font-semibold">
-                <span>Total</span>
-                <Amount value={total} signed={false} />
-              </div>
+              {budgetsLeft !== 0 ? (
+                <div className="border-t border-slate-200 bg-slate-50 text-sm">
+                  <div className="flex justify-between px-4 pt-3">
+                    <span className="text-slate-500">Total des comptes</span>
+                    <Amount value={accountsTotal} signed={false} />
+                  </div>
+                  <div className="flex justify-between px-4 pt-1">
+                    <span className="text-slate-500">Reste des budgets</span>
+                    <Amount value={budgetsLeft} />
+                  </div>
+                  <div className="flex justify-between px-4 pt-2 pb-3 text-base font-semibold">
+                    <span>Total après budgets</span>
+                    <Amount value={total} signed={false} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 font-semibold">
+                  <span>Total</span>
+                  <Amount value={total} signed={false} />
+                </div>
+              )}
             </div>
           </section>
 
