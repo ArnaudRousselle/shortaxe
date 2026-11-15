@@ -21,7 +21,7 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 
 **Ventilation** : une opération peut être répartie sur plusieurs catégories, en saisissant le montant de chaque part en euros (ex. Intermarché 100 € : 30 € Loisirs, 70 € Courses). La base de données vérifie que la somme de la ventilation est égale au montant.
 
-**Lignes de budget** : une échéance ou une opération peut être cochée « Budget » (enveloppe, ex. Courses 400 € par mois) ; elle apparaît en gris clair. Les opérations créées depuis une échéance « Budget » sont des lignes de budget. Dans la liste des opérations, le bouton « + » d'une ligne de budget ouvre la saisie d'une opération imputée dessus : son montant est déduit du budget (et de la part de même catégorie dans sa ventilation), l'écart est répercuté si on la modifie, et le montant est rendu au budget si on la supprime.
+**Lignes de budget** : une échéance ou une opération peut être cochée « Budget » (enveloppe, ex. Courses 400 € par mois) ; elle apparaît en gris clair. Les opérations créées depuis une échéance « Budget » sont des lignes de budget. Dans la liste des opérations, le bouton « + » d'une ligne de budget ouvre la saisie d'une opération imputée dessus : son montant est déduit du budget (et de la part de même catégorie dans sa ventilation), l'écart est répercuté si on la modifie, et le montant est rendu au budget si on la supprime. Un budget dépassé reste à 0 € et affiche « Dépassé de … » ; le dépassement est rendu en priorité si on supprime ou réduit une opération.
 
 **Partage familial** : tous les membres voient et modifient les mêmes données. Seules les adresses e-mail inscrites dans la table `family_members` ont accès aux données (sécurité appliquée côté base de données).
 
@@ -99,7 +99,7 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 | `accounts` | Comptes bancaires (nom, banque, solde initial, archivé) |
 | `categories` | Catégories personnalisables (nom, couleur, archivée) |
 | `transactions` | Opérations : montant **négatif = dépense**, **positif = recette** |
-| `transactions.is_budget` / `budget_id` | Ligne de budget / budget sur lequel l'opération est imputée (trigger de suppression + `budget_apply`) |
+| `transactions.is_budget` / `budget_id` / `budget_overrun` | Ligne de budget / budget sur lequel l'opération est imputée / dépassement du budget (trigger de suppression + `budget_apply`) |
 | `transaction_splits` | Ventilation d'une opération par catégorie (même signe que l'opération) |
 | `scheduled_transactions` | Échéancier : modèle d'opération + `frequency_months` (1 = tous les mois, 12 = tous les ans) + `next_date` |
 | `scheduled_transaction_splits` | Ventilation d'une échéance par catégorie |

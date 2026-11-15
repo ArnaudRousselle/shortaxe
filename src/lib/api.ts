@@ -94,6 +94,7 @@ function normalizeTx(t: Transaction): Transaction {
   return {
     ...t,
     amount: num(t.amount),
+    budget_overrun: num(t.budget_overrun),
     transaction_splits: (t.transaction_splits ?? []).map((s) => ({ ...s, amount: num(s.amount) })),
   }
 }

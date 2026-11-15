@@ -37,6 +37,8 @@ export type Transaction = {
   is_budget: boolean
   /** Ligne de budget sur laquelle l'opération est imputée */
   budget_id: string | null
+  /** Dépassement d'une ligne de budget (même signe que le budget, 0 sinon) : le budget reste alors à 0 */
+  budget_overrun: number
   created_at: string
   updated_at: string
   transaction_splits: Split[]

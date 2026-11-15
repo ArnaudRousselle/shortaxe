@@ -67,7 +67,12 @@ export function TransactionRow({
             })}
           </div>
         </div>
-        <Amount value={t.amount} muted={muted} className="font-semibold" />
+        <div className="shrink-0 text-right">
+          <Amount value={t.amount} muted={muted} className="font-semibold" />
+          {muted && t.budget_overrun !== 0 && (
+            <p className="text-xs font-medium text-red-600 tabular-nums">Dépassé de {formatEuro(Math.abs(t.budget_overrun))}</p>
+          )}
+        </div>
       </button>
       {onAddToBudget && (
         <button

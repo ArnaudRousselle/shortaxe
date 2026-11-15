@@ -169,11 +169,19 @@ export function TransactionModal({
             {linkedBudget ? (
               <>
                 Imputée sur le budget <strong>« {linkedBudget.label} »</strong> — reste {formatEuro(Math.abs(linkedBudget.amount))}
-                {linkedBudget.amount * (kind === 'depense' ? -1 : 1) < 0 && ' (dépassé)'}
+                {linkedBudget.budget_overrun !== 0 && (
+                  <span className="font-medium text-red-600"> · dépassé de {formatEuro(Math.abs(linkedBudget.budget_overrun))}</span>
+                )}
               </>
             ) : (
               'Opération imputée sur une ligne de budget.'
             )}
+          </p>
+        )}
+
+        {transaction?.is_budget && transaction.budget_overrun !== 0 && (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Budget dépassé de {formatEuro(Math.abs(transaction.budget_overrun))}. Si tu modifies le montant restant, le dépassement repart de zéro.
           </p>
         )}
 

@@ -68,6 +68,8 @@ create table if not exists public.transactions (
   is_budget   boolean not null default false,
   -- Ligne de budget sur laquelle l'opération est imputée
   budget_id   uuid references public.transactions(id) on delete set null,
+  -- Dépassement du budget (même signe que le budget) : le budget reste à 0
+  budget_overrun numeric(12,2) not null default 0,
   created_by  uuid default auth.uid() references auth.users(id) on delete set null,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -115,6 +117,7 @@ group by a.id, a.initial_balance;
 -- retirée ; modifiée, l'écart est répercuté ; supprimée, elle y est rendue.
 -- La ventilation du budget suit : chaque part est retirée de la part de même
 -- catégorie, le reste est pris sur la plus grosse part du budget.
+-- Dépassé, un budget reste à 0 et le dépassement est conservé dans budget_overrun.
 -- ---------------------------------------------------------------------
 -- p_factor = -1 : retire le montant de l'opération p_child de son budget
 -- p_factor = +1 : le rend au budget
@@ -125,11 +128,18 @@ security invoker
 set search_path = public
 as $$
 declare
-  v_budget uuid;
-  v_amount numeric;
-  v_rest   numeric;
-  v_target uuid;
-  s        record;
+  v_budget     uuid;
+  v_amount     numeric;
+  v_old_amount numeric;
+  v_old_over   numeric;
+  v_sign       numeric;
+  v_delta      numeric;
+  v_raw        numeric;
+  v_new_amount numeric;
+  v_new_over   numeric;
+  v_rest       numeric;
+  v_target     uuid;
+  s            record;
 begin
   select budget_id, amount into v_budget, v_amount
     from public.transactions where id = p_child;
@@ -138,43 +148,91 @@ begin
   end if;
 
   -- Verrou : deux imputations simultanées sur le même budget restent justes
-  perform 1 from public.transactions where id = v_budget for update;
+  select amount, budget_overrun into v_old_amount, v_old_over
+    from public.transactions where id = v_budget for update;
+
+  -- Sens du budget : -1 pour un budget de dépenses, +1 pour un budget de recettes
+  v_sign := case
+    when v_old_over <> 0   then sign(v_old_over)
+    when v_old_amount <> 0 then sign(v_old_amount)
+    when v_amount <> 0     then sign(v_amount)
+    else -1
+  end;
+
+  -- Montant « brut » (sans plafond à zéro) après imputation
+  v_delta := p_factor * v_amount;
+  v_raw   := v_old_amount - v_old_over + v_delta;
+
+  if v_raw = 0 or sign(v_raw) = v_sign then
+    v_new_amount := v_raw;
+    v_new_over   := 0;
+  else
+    -- Budget dépassé : il reste 0, le dépassement est conservé à part
+    v_new_amount := 0;
+    v_new_over   := -v_raw;
+  end if;
 
   update public.transactions
-     set amount = amount + p_factor * v_amount,
-         updated_at = now()
+     set amount         = v_new_amount,
+         budget_overrun = v_new_over,
+         updated_at     = now()
    where id = v_budget;
 
-  v_rest := v_amount;
-  for s in
-    select category_id, sum(amount) as amount
-      from public.transaction_splits
-     where transaction_id = p_child
-     group by category_id
-  loop
-    update public.transaction_splits
-       set amount = amount + p_factor * s.amount
-     where id = (
-       select id from public.transaction_splits
-        where transaction_id = v_budget and category_id = s.category_id
-        order by id limit 1
-     );
-    if found then
-      v_rest := v_rest - s.amount;
-    end if;
-  end loop;
-
-  if v_rest <> 0 then
-    select id into v_target
-      from public.transaction_splits
-     where transaction_id = v_budget
-     order by abs(amount) desc, id
-     limit 1;
-    if v_target is not null then
+  if v_new_amount - v_old_amount = v_delta then
+    -- Cas normal : chaque part est retirée de la part de même catégorie,
+    -- le reste est pris sur la plus grosse part du budget.
+    v_rest := v_amount;
+    for s in
+      select category_id, sum(amount) as amount
+        from public.transaction_splits
+       where transaction_id = p_child
+       group by category_id
+    loop
       update public.transaction_splits
-         set amount = amount + p_factor * v_rest
-       where id = v_target;
+         set amount = amount + p_factor * s.amount
+       where id = (
+         select id from public.transaction_splits
+          where transaction_id = v_budget and category_id = s.category_id
+          order by id limit 1
+       );
+      if found then
+        v_rest := v_rest - s.amount;
+      end if;
+    end loop;
+
+    if v_rest <> 0 then
+      select id into v_target
+        from public.transaction_splits
+       where transaction_id = v_budget
+       order by abs(amount) desc, id
+       limit 1;
+      if v_target is not null then
+        update public.transaction_splits
+           set amount = amount + p_factor * v_rest
+         where id = v_target;
+      end if;
     end if;
+  elsif v_new_amount = 0 then
+    -- Le budget passe à zéro (dépassé) : sa ventilation aussi
+    update public.transaction_splits set amount = 0 where transaction_id = v_budget;
+  else
+    -- Retour sous le plafond depuis un dépassement : le reste revient sur la
+    -- catégorie principale de l'opération si le budget l'a, sinon sur sa
+    -- première part.
+    select b.id into v_target
+      from public.transaction_splits b
+      left join (
+        select category_id, abs(sum(amount)) as weight
+          from public.transaction_splits
+         where transaction_id = p_child
+         group by category_id
+      ) c on c.category_id = b.category_id
+     where b.transaction_id = v_budget
+     order by c.weight desc nulls last, b.id
+     limit 1;
+    update public.transaction_splits
+       set amount = case when id = v_target then v_new_amount else 0 end
+     where transaction_id = v_budget;
   end if;
 end;
 $$;
@@ -267,6 +325,8 @@ begin
            is_checked = coalesce(p_is_checked, false),
            is_budget  = v_is_budget,
            budget_id  = p_budget_id,
+           -- Montant du budget saisi à la main : le dépassement repart de zéro
+           budget_overrun = case when v_is_budget and amount = p_amount then budget_overrun else 0 end,
            updated_at = now()
      where id = p_id
     returning id into v_id;
