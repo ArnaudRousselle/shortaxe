@@ -1,6 +1,6 @@
 # Shortaxe
 
-Application web de gestion des comptes de la famille : plusieurs comptes bancaires, opérations ventilées sur plusieurs catégories, budgets annuels par catégorie, rapports mensuels et annuels.
+Application web de gestion des comptes de la famille : plusieurs comptes bancaires, opérations ventilées sur plusieurs catégories, échéancier, rapports mensuels et annuels.
 
 - **Front** : React 19 + TypeScript (Vite), Tailwind CSS v4, React Router
 - **Données et connexion** : Supabase (PostgreSQL + Auth)
@@ -11,11 +11,10 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 
 | Écran | Contenu |
 |---|---|
-| Accueil | Soldes des comptes, reste à dépenser du mois par catégorie, dernières opérations |
+| Accueil | Soldes des comptes, dépenses du mois par catégorie, dernières opérations |
 | Opérations | Liste par mois ou par année, filtres compte / catégorie / recherche, pointage, saisie et modification |
 | Échéancier | Opérations récurrentes (fréquence en mois, prochaine échéance) ; les échéances du mois en orange ; sélection multiple puis « Créer les opérations » |
-| Budgets | Budget annuel par catégorie (navigation par année), dépensé, reste ; calcul automatique à partir de l'échéancier |
-| Rapports | Bilan mensuel ou annuel : recettes, dépenses, budgets, détail mois par mois |
+| Rapports | Bilan mensuel ou annuel : recettes, dépenses, dépensé par catégorie, détail mois par mois |
 | Évolution | Graphique du solde jour par jour (tous les comptes ou un seul) : historique réel et prévision tenant compte de l'échéancier ; par défaut d'il y a 1 an à dans 2 mois |
 | Comptes / Catégories | Création, modification, archivage |
 | Réglages | Accès aux autres écrans, déconnexion |
@@ -99,7 +98,6 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 | `categories` | Catégories personnalisables (nom, couleur, archivée) |
 | `transactions` | Opérations : montant **négatif = dépense**, **positif = recette** |
 | `transaction_splits` | Ventilation d'une opération par catégorie (même signe que l'opération) |
-| `annual_budgets` | Budget d'une catégorie pour une année (l'accueil et les rapports mensuels en utilisent un douzième par mois) |
 | `scheduled_transactions` | Échéancier : modèle d'opération + `frequency_months` (1 = tous les mois, 12 = tous les ans) + `next_date` |
 | `scheduled_transaction_splits` | Ventilation d'une échéance par catégorie |
 | `family_members` | E-mails autorisés à accéder aux données |
@@ -107,13 +105,11 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 Vues : `account_balances` (solde et solde pointé par compte), `category_monthly_totals` (total par catégorie et par mois).
 Fonctions : `save_transaction(...)` enregistre une opération et sa ventilation en une seule transaction, avec contrôle de cohérence ; `save_scheduled_transaction(...)` fait de même pour une échéance ; `create_transactions_from_schedule(ids)` crée les opérations des échéances choisies (datées de leur prochaine échéance, ventilation recopiée) et décale leur date de la fréquence (le jour voulu est conservé : un 31 donne le 30 ou le 28/29 selon le mois).
 
-L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas été transformée en opération, elle n'entre ni dans les soldes, ni dans les budgets, ni dans les rapports.
+L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas été transformée en opération, elle n'entre ni dans les soldes, ni dans les rapports.
 
 **Évolutions du schéma** : pour une base déjà installée, exécuter dans le SQL Editor les fichiers de `supabase/migrations/` qui n'ont pas encore été appliqués (`schema.sql` contient toujours le schéma complet pour une nouvelle installation).
 
-**Budget calculé à partir de l'échéancier** : pour l'année choisie, chaque échéance est comptée autant de fois qu'elle tombe dans l'année civile (selon sa fréquence et sa prochaine date, que les opérations aient déjà été créées ou non) ; les montants sont regroupés par catégorie (dépenses moins recettes ventilées). Après confirmation, tout le budget de l'année est remplacé : les catégories absentes de l'échéancier passent à 0. Rien n'est enregistré avant « Enregistrer ».
-
-Le « dépensé » d'une catégorie correspond aux dépenses moins les remboursements ventilés sur cette catégorie. Une opération sans catégorie (par exemple un virement entre deux comptes) n'entre dans aucun budget.
+Le « dépensé » d'une catégorie correspond aux dépenses moins les remboursements ventilés sur cette catégorie. Une opération sans catégorie (par exemple un virement entre deux comptes) n'apparaît dans aucune catégorie des rapports.
 
 ## Sauvegarde
 

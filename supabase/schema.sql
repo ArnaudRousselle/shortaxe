@@ -83,18 +83,6 @@ create index if not exists transaction_splits_tx_idx on public.transaction_split
 create index if not exists transaction_splits_cat_idx on public.transaction_splits (category_id);
 
 -- ---------------------------------------------------------------------
--- Budgets annuels par catégorie
--- ---------------------------------------------------------------------
-create table if not exists public.annual_budgets (
-  id          uuid primary key default gen_random_uuid(),
-  category_id uuid not null references public.categories(id) on delete cascade,
-  year        smallint not null check (year between 2000 and 2100),
-  amount      numeric(12,2) not null check (amount >= 0),
-  unique (category_id, year)
-);
-create index if not exists annual_budgets_year_idx on public.annual_budgets (year);
-
--- ---------------------------------------------------------------------
 -- Vues de reporting (respectent la sécurité de l'utilisateur connecté)
 -- ---------------------------------------------------------------------
 create or replace view public.category_monthly_totals
@@ -191,7 +179,6 @@ alter table public.accounts           enable row level security;
 alter table public.categories         enable row level security;
 alter table public.transactions       enable row level security;
 alter table public.transaction_splits enable row level security;
-alter table public.annual_budgets     enable row level security;
 
 drop policy if exists "famille lecture" on public.family_members;
 create policy "famille lecture" on public.family_members
@@ -213,10 +200,6 @@ drop policy if exists "famille" on public.transaction_splits;
 create policy "famille" on public.transaction_splits
   for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
 
-drop policy if exists "famille" on public.annual_budgets;
-create policy "famille" on public.annual_budgets
-  for all to authenticated using (public.is_family_member()) with check (public.is_family_member());
-
 -- Les visiteurs non connectés n'ont accès à rien.
 revoke all on all tables in schema public from anon;
 revoke execute on function public.save_transaction(uuid, uuid, date, text, numeric, text, boolean, jsonb) from anon, public;
@@ -230,7 +213,7 @@ grant  execute on function public.is_family_member() to authenticated;
 -- Échéances : mêmes informations qu'une opération, plus une fréquence (en mois)
 -- et la date de la prochaine opération à créer.
 -- Ces lignes ne sont PAS des opérations : elles n'entrent ni dans les soldes,
--- ni dans les budgets, ni dans les rapports.
+-- ni dans les rapports.
 create table if not exists public.scheduled_transactions (
   id               uuid primary key default gen_random_uuid(),
   account_id       uuid not null references public.accounts(id) on delete restrict,
