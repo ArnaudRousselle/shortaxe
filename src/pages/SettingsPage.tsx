@@ -29,7 +29,7 @@ export function SettingsPage() {
       a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
       const c = backup.counts
-      setInfo(`Sauvegarde téléchargée : ${c.accounts} comptes, ${c.categories} catégories, ${c.transactions} opérations, ${c.budgets} budgets, ${c.scheduled_transactions} échéances.`)
+      setInfo(`Sauvegarde téléchargée : ${c.accounts} comptes, ${c.categories} catégories, ${c.transactions} opérations, ${c.annual_budgets} budgets annuels, ${c.scheduled_transactions} échéances.`)
     } catch (e) {
       setError(errorMessage(e))
     } finally {

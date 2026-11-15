@@ -1,7 +1,10 @@
+import { monthlyBudgetsFromAnnual } from './budget'
+import { addMonths } from './format'
 import { supabase } from './supabase'
 import type {
   Account,
   AccountBalance,
+  AnnualBudget,
   Budget,
   Category,
   CategoryMonthlyTotal,
@@ -204,24 +207,31 @@ export async function countDueScheduled(before: string): Promise<number> {
 
 // ---------------------------------------------------------------- Budgets
 
-export async function listBudgets(from: string, to: string): Promise<Budget[]> {
+export async function listAnnualBudgets(fromYear: number, toYear: number = fromYear): Promise<AnnualBudget[]> {
   const rows = check(
-    await supabase.from('budgets').select('*').gte('month', from).lt('month', to),
-  ) as Budget[]
-  return rows.map((b) => ({ ...b, amount: num(b.amount) }))
+    await supabase.from('annual_budgets').select('*').gte('year', fromYear).lte('year', toYear),
+  ) as AnnualBudget[]
+  return rows.map((b) => ({ ...b, year: Number(b.year), amount: num(b.amount) }))
 }
 
-/** Enregistre les budgets d'un ou plusieurs mois. amount = null supprime le budget. */
-export async function upsertBudgets(
-  rows: { category_id: string; month: string; amount: number | null }[],
-): Promise<void> {
-  const toUpsert = rows.filter((r) => r.amount !== null) as { category_id: string; month: string; amount: number }[]
-  const toDelete = rows.filter((r) => r.amount === null)
+/** Parts mensuelles des budgets annuels pour les mois de [from, to[ (accueil, rapports). */
+export async function listBudgets(from: string, to: string): Promise<Budget[]> {
+  const lastMonth = addMonths(to, -1)
+  const annual = await listAnnualBudgets(Number(from.slice(0, 4)), Number(lastMonth.slice(0, 4)))
+  return monthlyBudgetsFromAnnual(annual, from, to)
+}
+
+/** Enregistre les budgets annuels d'une année. amount = null supprime le budget de la catégorie. */
+export async function saveAnnualBudgets(year: number, rows: { category_id: string; amount: number | null }[]): Promise<void> {
+  const toUpsert = rows
+    .filter((r) => r.amount !== null)
+    .map((r) => ({ category_id: r.category_id, year, amount: r.amount as number }))
+  const toDelete = rows.filter((r) => r.amount === null).map((r) => r.category_id)
   if (toUpsert.length) {
-    check(await supabase.from('budgets').upsert(toUpsert, { onConflict: 'category_id,month' }))
+    check(await supabase.from('annual_budgets').upsert(toUpsert, { onConflict: 'category_id,year' }))
   }
-  for (const r of toDelete) {
-    check(await supabase.from('budgets').delete().eq('category_id', r.category_id).eq('month', r.month))
+  if (toDelete.length) {
+    check(await supabase.from('annual_budgets').delete().eq('year', year).in('category_id', toDelete))
   }
 }
 
@@ -252,7 +262,7 @@ export async function exportAll(): Promise<object> {
     categories,
     transactions,
     transaction_splits,
-    budgets,
+    annual_budgets,
     scheduled_transactions,
     scheduled_transaction_splits,
   ] = await Promise.all([
@@ -260,20 +270,20 @@ export async function exportAll(): Promise<object> {
     fetchAll('categories'),
     fetchAll('transactions'),
     fetchAll('transaction_splits'),
-    fetchAll('budgets'),
+    fetchAll('annual_budgets'),
     fetchAll('scheduled_transactions'),
     fetchAll('scheduled_transaction_splits'),
   ])
   return {
     app: 'shortaxe',
-    format_version: 2,
+    format_version: 3,
     exported_at: new Date().toISOString(),
     counts: {
       accounts: accounts.length,
       categories: categories.length,
       transactions: transactions.length,
       transaction_splits: transaction_splits.length,
-      budgets: budgets.length,
+      annual_budgets: annual_budgets.length,
       scheduled_transactions: scheduled_transactions.length,
       scheduled_transaction_splits: scheduled_transaction_splits.length,
     },
@@ -282,7 +292,7 @@ export async function exportAll(): Promise<object> {
       categories,
       transactions,
       transaction_splits,
-      budgets,
+      annual_budgets,
       scheduled_transactions,
       scheduled_transaction_splits,
     },
