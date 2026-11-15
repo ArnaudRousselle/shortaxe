@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Logo } from './Logo'
-import { IconCalendar, IconChart, IconHome, IconList, IconLogout, IconSettings, IconTag, IconTrend, IconWallet } from './Icons'
+import { IconCalendar, IconHome, IconList, IconLogout, IconSettings, IconTrend, IconWallet } from './Icons'
 
 type NavItem = { to: string; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }
 
@@ -10,13 +10,11 @@ const mainNav: NavItem[] = [
   { to: '/', label: 'Accueil', icon: IconHome },
   { to: '/operations', label: 'Opérations', icon: IconList },
   { to: '/echeancier', label: 'Échéancier', icon: IconCalendar },
-  { to: '/rapports', label: 'Rapports', icon: IconChart },
   { to: '/evolution', label: 'Évolution', icon: IconTrend },
 ]
 
 const secondaryNav: NavItem[] = [
   { to: '/comptes', label: 'Comptes', icon: IconWallet },
-  { to: '/categories', label: 'Catégories', icon: IconTag },
   { to: '/reglages', label: 'Réglages', icon: IconSettings },
 ]
 
@@ -40,10 +38,10 @@ function SideLink({ item }: { item: NavItem }) {
 
 export function Layout() {
   const { session, signOut } = useAuth()
-  // Sur mobile, "Réglages" regroupe aussi Échéancier, Évolution, Comptes et Catégories
+  // Sur mobile, "Réglages" regroupe aussi Évolution et Comptes
   // (Évolution est aussi accessible depuis l'accueil)
   const bottomNav: NavItem[] = [
-    ...mainNav.filter((i) => i.to !== '/echeancier' && i.to !== '/evolution'),
+    ...mainNav.filter((i) => i.to !== '/evolution'),
     { to: '/reglages', label: 'Réglages', icon: IconSettings },
   ]
 
@@ -82,7 +80,7 @@ export function Layout() {
       </div>
 
       {/* Barre de navigation (mobile) */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
         {bottomNav.map((item) => {
           const Icon = item.icon
           return (

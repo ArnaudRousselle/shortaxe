@@ -11,10 +11,8 @@ import { isSupabaseConfigured } from './lib/supabase'
 import { DashboardPage } from './pages/DashboardPage'
 import { TransactionsPage } from './pages/TransactionsPage'
 import { SchedulePage } from './pages/SchedulePage'
-import { ReportsPage } from './pages/ReportsPage'
 import { BalancePage } from './pages/BalancePage'
 import { AccountsPage } from './pages/AccountsPage'
-import { CategoriesPage } from './pages/CategoriesPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 function Centered({ children }: { children: ReactNode }) {
@@ -65,10 +63,8 @@ function Gate() {
           <Route index element={<DashboardPage />} />
           <Route path="operations" element={<TransactionsPage />} />
           <Route path="echeancier" element={<SchedulePage />} />
-          <Route path="rapports" element={<ReportsPage />} />
           <Route path="evolution" element={<BalancePage />} />
           <Route path="comptes" element={<AccountsPage />} />
-          <Route path="categories" element={<CategoriesPage />} />
           <Route path="reglages" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

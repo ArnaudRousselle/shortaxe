@@ -13,12 +13,11 @@ import { IconPlus, IconSearch } from '../components/Icons'
 type Period = 'mois' | 'annee'
 
 export function TransactionsPage() {
-  const { accounts, categories } = useData()
+  const { accounts } = useData()
   const [period, setPeriod] = useState<Period>('mois')
   const [month, setMonth] = useState(currentMonth())
   const [year, setYear] = useState(Number(currentMonth().slice(0, 4)))
   const [accountId, setAccountId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [creating, setCreating] = useState(false)
@@ -64,27 +63,20 @@ export function TransactionsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return (data ?? []).filter((t) => {
-      if (categoryId === '__none__' && t.transaction_splits.length > 0) return false
-      if (categoryId && categoryId !== '__none__' && !t.transaction_splits.some((s) => s.category_id === categoryId)) return false
       if (q && !t.label.toLowerCase().includes(q) && !(t.notes ?? '').toLowerCase().includes(q)) return false
       return true
     })
-  }, [data, categoryId, search])
+  }, [data, search])
 
   const totals = useMemo(() => {
     let income = 0
     let expense = 0
     for (const t of filtered) {
-      // Si on filtre sur une catégorie, on ne compte que la part ventilée sur cette catégorie
-      const value =
-        categoryId && categoryId !== '__none__'
-          ? t.transaction_splits.filter((s) => s.category_id === categoryId).reduce((s, x) => s + x.amount, 0)
-          : t.amount
-      if (value > 0) income += value
-      else expense += value
+      if (t.amount > 0) income += t.amount
+      else expense += t.amount
     }
     return { income, expense, net: income + expense }
-  }, [filtered, categoryId])
+  }, [filtered])
 
   const byDay = useMemo(() => {
     const groups: { date: string; items: Transaction[] }[] = []
@@ -145,18 +137,11 @@ export function TransactionsPage() {
           />
           {period === 'mois' ? <MonthPicker month={month} onChange={setMonth} /> : <YearPicker year={year} onChange={setYear} />}
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <select className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)} aria-label="Compte">
             <option value="">Tous les comptes</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
-          <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Catégorie">
-            <option value="">Toutes les catégories</option>
-            <option value="__none__">Sans catégorie</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
           <div className="relative">

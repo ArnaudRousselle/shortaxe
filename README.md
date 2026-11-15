@@ -1,6 +1,6 @@
 # Shortaxe
 
-Application web de gestion des comptes de la famille : plusieurs comptes bancaires, opérations ventilées sur plusieurs catégories, échéancier, rapports mensuels et annuels.
+Application web de gestion des comptes de la famille : plusieurs comptes bancaires, opérations, échéancier, lignes de budget, évolution du solde.
 
 - **Front** : React 19 + TypeScript (Vite), Tailwind CSS v4, React Router
 - **Données et connexion** : Supabase (PostgreSQL + Auth)
@@ -11,17 +11,14 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 
 | Écran | Contenu |
 |---|---|
-| Accueil | Soldes des comptes, dépenses du mois par catégorie, dernières opérations |
-| Opérations | Liste par mois ou par année, filtres compte / catégorie / recherche, pointage, saisie et modification |
+| Accueil | Soldes des comptes, dernières opérations |
+| Opérations | Liste par mois ou par année, filtres compte / recherche, pointage, saisie et modification |
 | Échéancier | Opérations récurrentes (fréquence en mois, prochaine échéance) ; les échéances du mois en orange ; sélection multiple puis « Créer les opérations » |
-| Rapports | Bilan mensuel ou annuel : recettes, dépenses, dépensé par catégorie, détail mois par mois |
 | Évolution | Graphique du solde jour par jour (tous les comptes ou un seul) : historique réel et prévision tenant compte de l'échéancier ; par défaut d'il y a 1 an à dans 2 mois |
-| Comptes / Catégories | Création, modification, archivage |
+| Comptes | Création, modification, archivage |
 | Réglages | Accès aux autres écrans, déconnexion |
 
-**Ventilation** : une opération peut être répartie sur plusieurs catégories, en saisissant le montant de chaque part en euros (ex. Intermarché 100 € : 30 € Loisirs, 70 € Courses). La base de données vérifie que la somme de la ventilation est égale au montant.
-
-**Lignes de budget** : une échéance ou une opération peut être cochée « Budget » (enveloppe, ex. Courses 400 € par mois) ; elle porte sur une seule catégorie et apparaît en gris clair. Les opérations créées depuis une échéance « Budget » sont des lignes de budget. Dans la liste des opérations, le bouton « + » d'une ligne de budget ouvre la saisie d'une opération imputée dessus : son montant est déduit du budget, l'écart est répercuté si on la modifie, et le montant est rendu au budget si on la supprime. L'opération imputée prend la catégorie du budget, sans pouvoir la changer (elle suit si la catégorie du budget est modifiée). Un budget dépassé reste à 0 € et affiche « Dépassé de … » ; le dépassement est rendu en priorité si on supprime ou réduit une opération.
+**Lignes de budget** : une échéance ou une opération peut être cochée « Budget » (enveloppe, ex. Courses 400 € par mois) ; elle apparaît en gris clair. Les opérations créées depuis une échéance « Budget » sont des lignes de budget. Dans la liste des opérations, le bouton « + » d'une ligne de budget ouvre la saisie d'une opération imputée dessus : son montant est déduit du budget, l'écart est répercuté si on la modifie, et le montant est rendu au budget si on la supprime. Un budget dépassé reste à 0 € et affiche « Dépassé de … » ; le dépassement est rendu en priorité si on supprime ou réduit une opération.
 
 **Partage familial** : tous les membres voient et modifient les mêmes données. Seules les adresses e-mail inscrites dans la table `family_members` ont accès aux données (sécurité appliquée côté base de données).
 
@@ -57,7 +54,7 @@ npm run dev
 
 ### Tests
 
-Les calculs de `src/lib/` (solde et prévisions, échéancier, ventilation, formats, rapports) sont couverts par des tests unitaires [Vitest](https://vitest.dev) (fichiers `*.test.ts` à côté du code testé).
+Les calculs de `src/lib/` (solde et prévisions, échéancier, formats) sont couverts par des tests unitaires [Vitest](https://vitest.dev) (fichiers `*.test.ts` à côté du code testé).
 
 ```bash
 npm test             # lance les tests une fois
@@ -97,22 +94,17 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 | Table | Rôle |
 |---|---|
 | `accounts` | Comptes bancaires (nom, banque, solde initial, archivé) |
-| `categories` | Catégories personnalisables (nom, couleur, archivée) |
 | `transactions` | Opérations : montant **négatif = dépense**, **positif = recette** |
 | `transactions.is_budget` / `budget_id` / `budget_overrun` | Ligne de budget / budget sur lequel l'opération est imputée / dépassement du budget (trigger de suppression + `budget_apply`) |
-| `transaction_splits` | Ventilation d'une opération par catégorie (même signe que l'opération) |
 | `scheduled_transactions` | Échéancier : modèle d'opération + `frequency_months` (1 = tous les mois, 12 = tous les ans) + `next_date` |
-| `scheduled_transaction_splits` | Ventilation d'une échéance par catégorie |
 | `family_members` | E-mails autorisés à accéder aux données |
 
-Vues : `account_balances` (solde et solde pointé par compte), `category_monthly_totals` (total par catégorie et par mois).
-Fonctions : `save_transaction(...)` enregistre une opération et sa ventilation en une seule transaction, avec contrôle de cohérence ; `save_scheduled_transaction(...)` fait de même pour une échéance ; `create_transactions_from_schedule(ids)` crée les opérations des échéances choisies (datées de leur prochaine échéance, ventilation recopiée) et décale leur date de la fréquence (le jour voulu est conservé : un 31 donne le 30 ou le 28/29 selon le mois).
+Vue : `account_balances` (solde et solde pointé par compte).
+Fonctions : `save_transaction(...)` enregistre une opération et met à jour le budget sur lequel elle est imputée, en une seule transaction ; `save_scheduled_transaction(...)` enregistre une échéance ; `create_transactions_from_schedule(ids)` crée les opérations des échéances choisies (datées de leur prochaine échéance) et décale leur date de la fréquence (le jour voulu est conservé : un 31 donne le 30 ou le 28/29 selon le mois).
 
-L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas été transformée en opération, elle n'entre ni dans les soldes, ni dans les rapports.
+L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas été transformée en opération, elle n'entre pas dans les soldes (seule la prévision de l'écran Évolution en tient compte).
 
 **Évolutions du schéma** : pour une base déjà installée, exécuter dans le SQL Editor les fichiers de `supabase/migrations/` qui n'ont pas encore été appliqués (`schema.sql` contient toujours le schéma complet pour une nouvelle installation).
-
-Le « dépensé » d'une catégorie correspond aux dépenses moins les remboursements ventilés sur cette catégorie. Une opération sans catégorie (par exemple un virement entre deux comptes) n'apparaît dans aucune catégorie des rapports.
 
 ## Sauvegarde
 
@@ -124,7 +116,7 @@ Les sauvegardes sont assurées par Supabase (sauvegardes quotidiennes ; plan gra
 src/
   auth/        connexion, mot de passe, contrôle d'accès
   components/  mise en page, modale d'opération, composants communs
-  data/        comptes et catégories partagés entre les écrans
+  data/        comptes partagés entre les écrans
   lib/         client Supabase, accès aux données, formats, calculs (+ tests *.test.ts)
   pages/       un fichier par écran
 supabase/
