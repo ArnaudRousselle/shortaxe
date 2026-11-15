@@ -18,7 +18,7 @@ export function TransactionRow({
   onAddToBudget?: () => void
   showDate?: boolean
 }) {
-  const muted = t.is_budget
+  const isBudget = t.is_budget
   const { accountById } = useData()
   const account = t.account_id ? accountById[t.account_id] : undefined
   const allocs = t.transaction_budget_allocations
@@ -26,9 +26,9 @@ export function TransactionRow({
   const showAllocAmounts = allocs.length > 1 || (allocs.length === 1 && allocs[0].amount !== t.amount)
 
   return (
-    <li className={`flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 sm:px-4 ${muted ? 'text-slate-400' : ''}`}>
-      {onToggleChecked && muted && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
-      {onToggleChecked && !muted && (
+    <li className={`flex items-center gap-3 px-3 py-2.5 sm:px-4 ${isBudget ? 'bg-slate-100 hover:bg-slate-200/60' : 'hover:bg-slate-50'}`}>
+      {onToggleChecked && isBudget && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
+      {onToggleChecked && !isBudget && (
         <button
           onClick={onToggleChecked}
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
@@ -44,9 +44,9 @@ export function TransactionRow({
         <div className="min-w-0">
           <p className="truncate font-medium">
             {t.label}
-            {muted && <BudgetBadge />}
+            {isBudget && <BudgetBadge />}
           </p>
-          <div className={`mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${muted ? 'text-slate-400' : 'text-slate-500'}`}>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
             {showDate && <span>{t.date.split('-').reverse().join('/')}</span>}
             {t.account_id && <span className="truncate">{account?.name ?? '?'}</span>}
             {allocs.map((a) => (
@@ -58,8 +58,8 @@ export function TransactionRow({
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <Amount value={t.amount} muted={muted} className="font-semibold" />
-          {muted && t.budget_overrun !== 0 && (
+          <Amount value={t.amount} className="font-semibold" />
+          {isBudget && t.budget_overrun !== 0 && (
             <p className="text-xs font-medium text-red-600 tabular-nums">Dépassé de {formatEuro(Math.abs(t.budget_overrun))}</p>
           )}
         </div>
