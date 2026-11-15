@@ -117,7 +117,27 @@ Le « dépensé » d'une catégorie correspond aux dépenses moins les rembourse
 
 ## Sauvegarde
 
-**Réglages → Exporter en JSON** télécharge un fichier `shortaxe-sauvegarde-AAAA-MM-JJ.json` contenant toutes les tables. Supabase fait aussi ses propres sauvegardes quotidiennes (plan gratuit : rétention limitée).
+**Réglages → Exporter en JSON** télécharge un fichier `shortaxe-sauvegarde-AAAA-MM-JJ.json` contenant toutes les tables.
+
+Sur le plan gratuit, Supabase ne donne accès à aucune sauvegarde restaurable. Le workflow GitHub Actions `.github/workflows/backup.yml` fait donc chaque nuit un dump complet de la base de **production** (rôles, schéma, données), chiffré en AES-256 avec GPG puis conservé 30 jours comme artefact du workflow. Il peut aussi être lancé à la main (onglet **Actions → Sauvegarde de la base → Run workflow**).
+
+**Mise en place** (une seule fois), dans **Settings → Secrets and variables → Actions** du dépôt :
+
+- `SUPABASE_DB_URL` : chaîne de connexion **Session pooler** du projet `shortaxe` (bouton **Connect** du tableau de bord Supabase), avec le mot de passe de la base à la place de `[YOUR-PASSWORD]`. La connexion directe ne marche pas depuis GitHub Actions, qui ne parle pas IPv6.
+- `BACKUP_PASSPHRASE` : une longue phrase secrète. Garde-la aussi dans un gestionnaire de mots de passe : sans elle, les sauvegardes sont illisibles.
+
+Le dépôt étant public, n'importe quel compte GitHub peut télécharger les artefacts ; c'est pour ça qu'ils sont chiffrés.
+
+**Restauration** (sur un projet Supabase vide, de préférence un projet de test d'abord) :
+
+```bash
+gpg --decrypt shortaxe-AAAA-MM-JJ.tar.gz.gpg | tar -xz   # demande la phrase secrète
+psql --single-transaction --variable ON_ERROR_STOP=1 \
+  --file roles.sql --file schema.sql \
+  --command 'SET session_replication_role = replica' \
+  --file data.sql \
+  --dbname "<chaîne de connexion du projet cible>"
+```
 
 ## Structure du code
 

@@ -1,0 +1,74 @@
+name: Sauvegarde de la base
+
+# Sauvegarde quotidienne de la base de production (projet Supabase `shortaxe`).
+# Le dépôt est public : les artefacts d'un dépôt public sont téléchargeables par
+# n'importe quel compte GitHub, donc la sauvegarde est chiffrée (GPG, AES-256)
+# avant d'être publiée. Sans la phrase secrète, le fichier est illisible.
+#
+# Secrets à créer dans Settings > Secrets and variables > Actions :
+#   SUPABASE_DB_URL    chaîne de connexion « Session pooler » du projet `shortaxe`
+#                      (bouton Connect du tableau de bord Supabase), mot de passe inclus
+#   BACKUP_PASSPHRASE  phrase secrète de chiffrement (à conserver hors de GitHub)
+#
+# Restauration : voir la section « Sauvegardes » du README.
+
+on:
+  schedule:
+    - cron: '17 2 * * *' # chaque nuit vers 3 h 17 (heure de Paris en hiver)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sauvegarde-base
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump chiffré de la production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Vérifier les secrets
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Les secrets SUPABASE_DB_URL et BACKUP_PASSPHRASE doivent être définis."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Exporter rôles, schéma et données
+        run: |
+          mkdir -p backup
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f backup/roles.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy -f backup/data.sql
+          # Un dump de données vide signale un problème : on échoue plutôt que de sauvegarder du vide.
+          test -s backup/data.sql
+          ls -l backup
+
+      - name: Archiver et chiffrer
+        id: archive
+        run: |
+          name="shortaxe-$(date -u +%Y-%m-%d)"
+          tar -czf "$name.tar.gz" -C backup .
+          gpg --batch --yes --pinentry-mode loopback \
+            --symmetric --cipher-algo AES256 \
+            --passphrase-file <(printf '%s' "$BACKUP_PASSPHRASE") \
+            -o "$name.tar.gz.gpg" "$name.tar.gz"
+          rm -rf backup "$name.tar.gz"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: ${{ steps.archive.outputs.name }}.tar.gz.gpg
+          retention-days: 30
+          if-no-files-found: error
