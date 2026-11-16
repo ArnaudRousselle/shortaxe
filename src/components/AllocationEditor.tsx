@@ -1,10 +1,13 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type { AllocationResult, AllocationRow } from '../lib/allocations'
-import { centsToInput, formatBudgetOption, formatEuro } from '../lib/format'
+import { budgetTone, centsToInput, formatBudgetOption, formatEuro } from '../lib/format'
 import type { BudgetLine } from '../lib/types'
 import { IconPlus, IconTrash } from './Icons'
 
 let nextKey = 1
+
+/** Couleur du libellé d'un budget dans la liste de choix (vert = reste, rouge = dépassé) */
+const TONE_CLASS = { positive: 'text-green-700', negative: 'text-red-600', neutral: '' } as const
 
 /** Nouvelle clé unique pour une ligne de répartition */
 export function newAllocationKey(): number {
@@ -58,41 +61,46 @@ export function AllocationEditor({
       </div>
 
       <div className="space-y-2">
-        {rows.map((r) => (
-          <div key={r.key} className="flex items-center gap-2">
-            <select
-              className="input min-w-0 flex-1"
-              value={r.budgetId}
-              onChange={(e) => updateRow(r.key, { budgetId: e.target.value })}
-              aria-label="Ligne de budget"
-            >
-              <option value="">Choisir un budget…</option>
-              {budgets.map((b) => (
-                <option key={b.id} value={b.id}>{formatBudgetOption(b)}</option>
-              ))}
-            </select>
-            <div className="relative w-28 shrink-0">
-              <input
-                className="input pr-7 text-right tabular-nums"
-                inputMode="decimal"
-                value={r.value}
-                onChange={(e) => updateRow(r.key, { value: e.target.value })}
-                placeholder={single && hasTotal ? centsToInput(totalCents) : '0,00'}
-                aria-label="Montant de la part"
-                title={single ? 'Laisse vide pour rattacher tout le montant' : undefined}
-              />
-              <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500">€</span>
+        {rows.map((r) => {
+          const selected = budgets.find((b) => b.id === r.budgetId)
+          return (
+            <div key={r.key} className="flex items-center gap-2">
+              <select
+                className={`input min-w-0 flex-1 ${selected ? TONE_CLASS[budgetTone(selected)] : ''}`}
+                value={r.budgetId}
+                onChange={(e) => updateRow(r.key, { budgetId: e.target.value })}
+                aria-label="Ligne de budget"
+              >
+                <option value="" className="text-slate-900">Choisir un budget…</option>
+                {budgets.map((b) => (
+                  <option key={b.id} value={b.id} className={TONE_CLASS[budgetTone(b)] || 'text-slate-900'}>
+                    {formatBudgetOption(b)}
+                  </option>
+                ))}
+              </select>
+              <div className="relative w-28 shrink-0">
+                <input
+                  className="input pr-7 text-right tabular-nums"
+                  inputMode="decimal"
+                  value={r.value}
+                  onChange={(e) => updateRow(r.key, { value: e.target.value })}
+                  placeholder={single && hasTotal ? centsToInput(totalCents) : '0,00'}
+                  aria-label="Montant de la part"
+                  title={single ? 'Laisse vide pour rattacher tout le montant' : undefined}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-500">€</span>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost shrink-0"
+                onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                aria-label="Retirer cette part"
+              >
+                <IconTrash className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              className="btn-ghost shrink-0"
-              onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
-              aria-label="Retirer cette part"
-            >
-              <IconTrash className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
