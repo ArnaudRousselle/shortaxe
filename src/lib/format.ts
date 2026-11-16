@@ -114,10 +114,25 @@ export function formatRef(ref: number): string {
   return `#${ref}`
 }
 
-/** Ligne de budget dans une liste de choix : « #12 - Courses - reste 230,00 € » (ou « dépassé de … ») */
-export function formatBudgetOption(b: { ref: number; label: string; amount: number; budget_overrun: number }): string {
-  const rest = b.budget_overrun !== 0 ? `dépassé de ${formatEuro(Math.abs(b.budget_overrun))}` : `reste ${formatEuro(Math.abs(b.amount))}`
-  return `${formatRef(b.ref)} - ${b.label} - ${rest}`
+type BudgetOptionSource = { ref: number; label: string; amount: number; budget_overrun: number }
+
+/**
+ * Solde d'une ligne de budget vu de l'utilisateur : positif = reste disponible,
+ * négatif = dépassement, 0 = budget épuisé pile.
+ */
+export function budgetBalance(b: Pick<BudgetOptionSource, 'amount' | 'budget_overrun'>): number {
+  return b.budget_overrun !== 0 ? -Math.abs(b.budget_overrun) : Math.abs(b.amount)
+}
+
+/** Couleur d'une ligne de budget : vert s'il reste de l'argent, rouge s'il est dépassé, neutre à 0 */
+export function budgetTone(b: Pick<BudgetOptionSource, 'amount' | 'budget_overrun'>): 'positive' | 'negative' | 'neutral' {
+  const balance = budgetBalance(b)
+  return balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'
+}
+
+/** Ligne de budget dans une liste de choix : « #12 - Courses (+230,00 €) », « (−15,50 €) » si dépassé */
+export function formatBudgetOption(b: BudgetOptionSource): string {
+  return `${formatRef(b.ref)} - ${b.label} (${formatSignedEuro(budgetBalance(b))})`
 }
 
 // ---------- Échéancier ----------

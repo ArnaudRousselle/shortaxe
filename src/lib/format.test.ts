@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   addMonths,
+  budgetBalance,
+  budgetTone,
   formatBudgetOption,
   formatRef,
   centsToInput,
@@ -179,13 +181,22 @@ describe('lignes de budget', () => {
     expect(formatRef(12)).toBe('#12')
   })
 
-  it('affiche « numéro - libellé - reste »', () => {
-    const label = formatBudgetOption({ ref: 12, label: 'Courses', amount: -230, budget_overrun: 0 })
-    expect(label.replace(/\s/g, ' ')).toBe('#12 - Courses - reste 230,00 €')
+  it('affiche le reste avec un signe +', () => {
+    const b = { ref: 12, label: 'Courses', amount: -230, budget_overrun: 0 }
+    expect(formatBudgetOption(b).replace(/\s/g, ' ')).toBe('#12 - Courses (+230,00 €)')
+    expect(budgetTone(b)).toBe('positive')
   })
 
-  it('affiche le dépassement à la place du reste', () => {
-    const label = formatBudgetOption({ ref: 3, label: 'Essence', amount: 0, budget_overrun: -15.5 })
-    expect(label.replace(/\s/g, ' ')).toBe('#3 - Essence - dépassé de 15,50 €')
+  it('affiche le dépassement avec un signe −', () => {
+    const b = { ref: 3, label: 'Essence', amount: 0, budget_overrun: -15.5 }
+    expect(formatBudgetOption(b).replace(/\s/g, ' ')).toBe('#3 - Essence (−15,50 €)')
+    expect(budgetBalance(b)).toBe(-15.5)
+    expect(budgetTone(b)).toBe('negative')
+  })
+
+  it('reste neutre pour un budget à zéro', () => {
+    const b = { ref: 7, label: 'Loisirs', amount: 0, budget_overrun: 0 }
+    expect(formatBudgetOption(b).replace(/\s/g, ' ')).toBe('#7 - Loisirs (0,00 €)')
+    expect(budgetTone(b)).toBe('neutral')
   })
 })
