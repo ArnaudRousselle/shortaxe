@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useData } from '../data/DataProvider'
-import { listBalances, listScheduled, listTransactions } from '../lib/api'
+import { listBalances, listBudgets, listScheduled, listTransactions } from '../lib/api'
 import { buildBalanceSeries, pointValue, projectSchedule, shiftMonths, type BalancePoint } from '../lib/balance'
 import { formatDateShort, formatEuro, todayISO, round2 } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
@@ -42,27 +42,33 @@ export function BalancePage() {
   const rangeError = !from || !to ? 'Choisis une date de début et de fin.' : from > to ? 'La date de début doit précéder la date de fin.' : null
 
   const load = useCallback(async () => {
-    const [balances, transactions, scheduled] = await Promise.all([
+    const [balances, budgets, transactions, scheduled] = await Promise.all([
       listBalances(),
+      listBudgets(),
       // Toutes les opérations à partir du début de période (y compris celles datées dans le futur)
       listTransactions({ from, limit: 100_000 }),
       listScheduled(),
     ])
-    return { balances, transactions, scheduled }
+    return { balances, budgets, transactions, scheduled }
   }, [from])
   const { data, loading, error } = useAsync(load, [load])
 
   const view = useMemo(() => {
     if (!data || rangeError) return null
     const ids = new Set(accountId ? [accountId] : activeAccounts.map((a) => a.id))
-    const txs = data.transactions.filter((t) => ids.has(t.account_id))
+    // Les lignes de budget n'ont pas de compte : leur reste compte comme une dépense prévue
+    // dans la vue « tous les comptes » uniquement
+    const withBudgets = !accountId
+    const included = (id: string | null) => (id === null ? withBudgets : ids.has(id))
+    const txs = data.transactions.filter((t) => included(t.account_id))
     // Solde actuel (toutes opérations) − opérations depuis le début de période = solde la veille du début
-    const current = [...ids].reduce((s, id) => s + (data.balances[id]?.balance ?? 0), 0)
+    const budgetsTotal = withBudgets ? data.budgets.reduce((s, b) => s + b.amount, 0) : 0
+    const current = [...ids].reduce((s, id) => s + (data.balances[id]?.balance ?? 0), 0) + budgetsTotal
     const sinceFrom = txs.reduce((s, t) => s + t.amount, 0)
     const balanceBeforeFrom = round2(current - sinceFrom)
 
     const projected = projectSchedule(
-      data.scheduled.filter((s) => ids.has(s.account_id)),
+      data.scheduled.filter((s) => included(s.account_id)),
       today,
       to,
     )
@@ -181,7 +187,7 @@ export function BalancePage() {
                             <p className="truncate text-xs text-slate-500">
                               {formatDateShort(p.dueDate)}
                               {p.overdue && <span className="ml-1.5 rounded bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800">à créer</span>}
-                              {view.showAccount && ` · ${accountById[p.account_id]?.name ?? ''}`}
+                              {view.showAccount && ` · ${p.account_id ? (accountById[p.account_id]?.name ?? '') : 'Budget'}`}
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
@@ -204,7 +210,8 @@ export function BalancePage() {
               <p className="mt-3 text-xs text-slate-500">
                 Le prévisionnel ajoute au solde réel les opérations déjà saisies avec une date future et chaque occurrence des échéances
                 jusqu’à la fin de la période. Une échéance en retard (pas encore créée) est comptée aujourd’hui. Les comptes archivés ne sont
-                pas inclus dans « Tous les comptes ».
+                pas inclus dans « Tous les comptes ». Le reste des lignes de budget (sans compte) compte comme une dépense prévue dans
+                « Tous les comptes » seulement.
               </p>
             </>
           )}

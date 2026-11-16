@@ -107,6 +107,34 @@ export function formatDateShort(iso: string): string {
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(parseISO(iso))
 }
 
+// ---------- Lignes de budget ----------
+
+/** 12 → "#12" : numéro court d'une opération */
+export function formatRef(ref: number): string {
+  return `#${ref}`
+}
+
+type BudgetOptionSource = { ref: number; label: string; amount: number; budget_overrun: number }
+
+/**
+ * Solde d'une ligne de budget vu de l'utilisateur : positif = reste disponible,
+ * négatif = dépassement, 0 = budget épuisé pile.
+ */
+export function budgetBalance(b: Pick<BudgetOptionSource, 'amount' | 'budget_overrun'>): number {
+  return b.budget_overrun !== 0 ? -Math.abs(b.budget_overrun) : Math.abs(b.amount)
+}
+
+/** Couleur d'une ligne de budget : vert s'il reste de l'argent, rouge s'il est dépassé, neutre à 0 */
+export function budgetTone(b: Pick<BudgetOptionSource, 'amount' | 'budget_overrun'>): 'positive' | 'negative' | 'neutral' {
+  const balance = budgetBalance(b)
+  return balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'
+}
+
+/** Ligne de budget dans une liste de choix : « #12 - Courses (+230,00 €) », « (−15,50 €) » si dépassé */
+export function formatBudgetOption(b: BudgetOptionSource): string {
+  return `${formatRef(b.ref)} - ${b.label} (${formatSignedEuro(budgetBalance(b))})`
+}
+
 // ---------- Échéancier ----------
 
 /** 1 → "Tous les mois", 12 → "Tous les ans", 3 → "Tous les 3 mois" */

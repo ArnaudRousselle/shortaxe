@@ -46,7 +46,7 @@ export function ScheduleModal({
     setError(null)
     if (item) {
       setKind(item.amount < 0 ? 'depense' : 'recette')
-      setAccountId(item.account_id)
+      setAccountId(item.account_id ?? activeAccounts[0]?.id ?? '')
       setNextDate(item.next_date)
       setFrequency(String(item.frequency_months))
       setLabel(item.label)
@@ -72,7 +72,7 @@ export function ScheduleModal({
   async function onSubmit() {
     setError(null)
     const freq = Number(frequency)
-    if (!accountId) return setError('Choisis un compte.')
+    if (!isBudget && !accountId) return setError('Choisis un compte.')
     if (!label.trim()) return setError('Le libellé est obligatoire.')
     if (!nextDate) return setError('La date de prochaine échéance est obligatoire.')
     if (!Number.isInteger(freq) || freq < 1 || freq > 120) return setError('La fréquence doit être un nombre entier de mois (de 1 à 120).')
@@ -82,7 +82,7 @@ export function ScheduleModal({
     try {
       await saveScheduled({
         id: item?.id ?? null,
-        account_id: accountId,
+        account_id: isBudget ? null : accountId,
         label: label.trim(),
         amount: (sign * totalCents) / 100,
         notes: notes.trim() || null,
@@ -162,17 +162,19 @@ export function ScheduleModal({
           <datalist id="st-labels">{labels.map((l) => <option key={l} value={l} />)}</datalist>
         </div>
 
-        <div>
-          <label className="label" htmlFor="st-account">Compte</label>
-          <select id="st-account" className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            {activeAccounts.length === 0 && <option value="">Crée d’abord un compte</option>}
-            {activeAccounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}{a.bank ? ` — ${a.bank}` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!isBudget && (
+          <div>
+            <label className="label" htmlFor="st-account">Compte</label>
+            <select id="st-account" className="input" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              {activeAccounts.length === 0 && <option value="">Crée d’abord un compte</option>}
+              {activeAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}{a.bank ? ` — ${a.bank}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="label" htmlFor="st-frequency">Fréquence (se répète tous les … mois)</label>
@@ -214,11 +216,11 @@ export function ScheduleModal({
         </div>
 
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
+          <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0" checked={isBudget} onChange={(e) => setIsBudget(e.target.checked)} />
           <span>
             Budget
             <span className="block text-xs text-slate-500">
-              Les opérations créées seront des enveloppes : les dépenses imputées dessus en seront déduites.
+              Sans compte. Les opérations créées seront des lignes de budget : les opérations rattachées en seront déduites.
             </span>
           </span>
         </label>

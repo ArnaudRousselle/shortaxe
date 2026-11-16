@@ -1,33 +1,37 @@
 import { useData } from '../data/DataProvider'
-import { formatEuro } from '../lib/format'
+import { formatEuro, formatRef } from '../lib/format'
 import type { Transaction } from '../lib/types'
 import { Amount, BudgetBadge } from './ui'
-import { IconCheck, IconPlus } from './Icons'
+import { IconCheck, IconEye, IconPlus } from './Icons'
 
 export function TransactionRow({
   transaction: t,
   onClick,
   onToggleChecked,
   onAddToBudget,
-  budgetLabel,
+  onShowBudgetChildren,
   showDate,
 }: {
   transaction: Transaction
   onClick: () => void
   onToggleChecked?: () => void
-  /** Ligne de budget : bouton « + » pour saisir une opération imputée dessus */
+  /** Ligne de budget : bouton « + » pour saisir une opération rattachée à ce budget */
   onAddToBudget?: () => void
-  /** Libellé du budget sur lequel l'opération est imputée */
-  budgetLabel?: string
+  /** Ligne de budget : bouton « œil » pour voir les opérations rattachées */
+  onShowBudgetChildren?: () => void
   showDate?: boolean
 }) {
-  const muted = t.is_budget
+  const isBudget = t.is_budget
   const { accountById } = useData()
-  const account = accountById[t.account_id]
+  const account = t.account_id ? accountById[t.account_id] : undefined
+  const allocs = t.transaction_budget_allocations
+  // Montant de chaque part affiché sauf si une seule part couvre toute l'opération
+  const showAllocAmounts = allocs.length > 1 || (allocs.length === 1 && allocs[0].amount !== t.amount)
 
   return (
-    <li className={`flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 sm:px-4 ${muted ? 'text-slate-400' : ''}`}>
-      {onToggleChecked && (
+    <li className={`flex items-center gap-3 px-3 py-2.5 sm:px-4 ${isBudget ? 'bg-slate-100 hover:bg-slate-200/60' : 'hover:bg-slate-50'}`}>
+      {onToggleChecked && isBudget && <span className="h-6 w-6 shrink-0" aria-hidden="true" />}
+      {onToggleChecked && !isBudget && (
         <button
           onClick={onToggleChecked}
           className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
@@ -42,26 +46,38 @@ export function TransactionRow({
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
         <div className="min-w-0">
           <p className="truncate font-medium">
+            {isBudget && <span className="mr-1.5 text-slate-500 tabular-nums">{formatRef(t.ref)}</span>}
             {t.label}
-            {muted && <BudgetBadge />}
+            {isBudget && <BudgetBadge />}
           </p>
-          <div className={`mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${muted ? 'text-slate-400' : 'text-slate-500'}`}>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
             {showDate && <span>{t.date.split('-').reverse().join('/')}</span>}
-            <span className="truncate">{account?.name ?? '?'}</span>
-            {t.budget_id && (
-              <span className="truncate text-slate-400" title="Opération imputée sur un budget">
-                ↳ {budgetLabel ? `Budget ${budgetLabel}` : 'Budget'}
+            {t.account_id && <span className="truncate">{account?.name ?? '?'}</span>}
+            {allocs.map((a) => (
+              <span key={a.budget_id} className="inline-flex max-w-full items-center gap-1 text-slate-400" title="Rattachée à une ligne de budget">
+                <span className="truncate">↳ {a.budget ? `${formatRef(a.budget.ref)} ${a.budget.label}` : 'Budget'}</span>
+                {showAllocAmounts && <span className="shrink-0 tabular-nums">{formatEuro(Math.abs(a.amount))}</span>}
               </span>
-            )}
+            ))}
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <Amount value={t.amount} muted={muted} className="font-semibold" />
-          {muted && t.budget_overrun !== 0 && (
+          <Amount value={t.amount} className="font-semibold" />
+          {isBudget && t.budget_overrun !== 0 && (
             <p className="text-xs font-medium text-red-600 tabular-nums">Dépassé de {formatEuro(Math.abs(t.budget_overrun))}</p>
           )}
         </div>
       </button>
+      {onShowBudgetChildren && (
+        <button
+          onClick={onShowBudgetChildren}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700"
+          aria-label={`Voir les opérations du budget ${t.label}`}
+          title="Voir les opérations rattachées à ce budget"
+        >
+          <IconEye className="h-4 w-4" />
+        </button>
+      )}
       {onAddToBudget && (
         <button
           onClick={onAddToBudget}

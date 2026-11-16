@@ -18,7 +18,7 @@ Application web de gestion des comptes de la famille : plusieurs comptes bancair
 | Comptes | Création, modification, archivage |
 | Réglages | Accès aux autres écrans, déconnexion |
 
-**Lignes de budget** : une échéance ou une opération peut être cochée « Budget » (enveloppe, ex. Courses 400 € par mois) ; elle apparaît en gris clair. Les opérations créées depuis une échéance « Budget » sont des lignes de budget. Dans la liste des opérations, le bouton « + » d'une ligne de budget ouvre la saisie d'une opération imputée dessus : son montant est déduit du budget, l'écart est répercuté si on la modifie, et le montant est rendu au budget si on la supprime. Un budget dépassé reste à 0 € et affiche « Dépassé de … » ; le dépassement est rendu en priorité si on supprime ou réduit une opération.
+**Lignes de budget** : une échéance ou une opération peut être cochée « Budget » (enveloppe, ex. Courses 400 € par mois). Une ligne de budget n'a pas de compte et apparaît en gris clair ; les opérations créées depuis une échéance « Budget » sont des lignes de budget. Une opération peut être répartie sur une ou plusieurs lignes de budget (ex. Intermarché 150 € : 50 € Courses, 100 € Loisirs) ; la somme des parts ne peut pas dépasser son montant, le reste n'est rattaché à aucun budget. Chaque part est déduite de son budget, l'écart est répercuté si on modifie l'opération, et la part est rendue si on la supprime ; une recette rattachée à un budget de dépenses le recrédite. Le bouton « + » d'une ligne de budget pré-remplit une nouvelle opération avec ce budget. Un budget dépassé reste à 0 € et affiche « Dépassé de … » ; le dépassement est rendu en priorité. Une ligne de budget ne peut pas être supprimée, ni cesser d'être un budget, tant que des opérations y sont rattachées. Le reste des budgets compte comme une dépense prévue dans le total de l'accueil et dans l'évolution « Tous les comptes », pas dans le solde d'un compte.
 
 **Partage familial** : tous les membres voient et modifient les mêmes données. Seules les adresses e-mail inscrites dans la table `family_members` ont accès aux données (sécurité appliquée côté base de données).
 
@@ -95,12 +95,13 @@ Sur smartphone, ouvre le site puis « Ajouter à l'écran d'accueil » pour l'ut
 |---|---|
 | `accounts` | Comptes bancaires (nom, banque, solde initial, archivé) |
 | `transactions` | Opérations : montant **négatif = dépense**, **positif = recette** |
-| `transactions.is_budget` / `budget_id` / `budget_overrun` | Ligne de budget / budget sur lequel l'opération est imputée / dépassement du budget (trigger de suppression + `budget_apply`) |
+| `transactions.is_budget` / `budget_overrun` | Ligne de budget (sans compte) / dépassement du budget |
+| `transaction_budget_allocations` | Répartition d'une opération sur des lignes de budget (part du même signe que l'opération ; somme ≤ montant) |
 | `scheduled_transactions` | Échéancier : modèle d'opération + `frequency_months` (1 = tous les mois, 12 = tous les ans) + `next_date` |
 | `family_members` | E-mails autorisés à accéder aux données |
 
 Vue : `account_balances` (solde et solde pointé par compte).
-Fonctions : `save_transaction(...)` enregistre une opération et met à jour le budget sur lequel elle est imputée, en une seule transaction ; `save_scheduled_transaction(...)` enregistre une échéance ; `create_transactions_from_schedule(ids)` crée les opérations des échéances choisies (datées de leur prochaine échéance) et décale leur date de la fréquence (le jour voulu est conservé : un 31 donne le 30 ou le 28/29 selon le mois).
+Fonctions : `save_transaction(...)` enregistre une opération et sa répartition sur les budgets, et met à jour ces budgets (`budget_apply`), en une seule transaction ; un trigger rend les parts aux budgets à la suppression ; `save_scheduled_transaction(...)` enregistre une échéance ; `create_transactions_from_schedule(ids)` crée les opérations des échéances choisies (datées de leur prochaine échéance) et décale leur date de la fréquence (le jour voulu est conservé : un 31 donne le 30 ou le 28/29 selon le mois).
 
 L'échéancier n'est qu'un ensemble de modèles : tant qu'une échéance n'a pas été transformée en opération, elle n'entre pas dans les soldes (seule la prévision de l'écran Évolution en tient compte).
 

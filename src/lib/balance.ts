@@ -52,7 +52,8 @@ export function advanceSchedule(iso: string, months: number, dayOfMonth: number)
 /** Opération prévue, issue d'une échéance */
 export type ProjectedItem = {
   scheduleId: string
-  account_id: string
+  /** Aucun compte pour une échéance « budget » */
+  account_id: string | null
   label: string
   amount: number
   /** Date utilisée pour la prévision (aujourd'hui si l'échéance est en retard) */

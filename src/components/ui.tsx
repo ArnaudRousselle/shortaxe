@@ -27,16 +27,13 @@ export function EmptyState({ children }: { children: ReactNode }) {
 export function Amount({
   value,
   signed = true,
-  muted = false,
   className = '',
 }: {
   value: number
   signed?: boolean
-  /** Gris clair (lignes de budget) */
-  muted?: boolean
   className?: string
 }) {
-  const color = muted ? 'text-slate-400' : value > 0 ? 'text-emerald-700' : value < 0 ? 'text-slate-900' : 'text-slate-500'
+  const color = value > 0 ? 'text-emerald-700' : value < 0 ? 'text-slate-900' : 'text-slate-500'
   return (
     <span className={`tabular-nums whitespace-nowrap ${color} ${className}`}>
       {signed ? formatSignedEuro(value) : formatEuro(value)}
